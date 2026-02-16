@@ -1,6 +1,6 @@
 name: mcp_bundle
-description: Bundle schema, loader, validator, and expression language providing the foundation for the MCP knowledge ecosystem.
-version: 0.1.0
+description: Bundle schema, loader, validator, expression language, and port contracts providing the foundation for the MCP ecosystem.
+version: 0.2.0
 homepage: https://app-appplayer.github.io/makemind
 repository: https://github.com/app-appplayer/mcp_bundle
 issue_tracker: https://github.com/app-appplayer/mcp_bundle/issues
@@ -11,7 +11,7 @@ topics:
   - mcp
   - ai
   - dart
-  - schema
+  - ports
 
 environment:
   sdk: ^3.0.0

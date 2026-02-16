@@ -1,4 +1,4 @@
-/// MCP Bundle - Schema, models, loader, validator, and expression language.
+/// MCP Bundle - Schema, models, loader, validator, expression language, and port contracts.
 ///
 /// This package provides tools for working with MCP Bundle data:
 /// - Data models for all bundle sections (UI, Flow, Skills, etc.)
@@ -6,6 +6,7 @@
 /// - Schema validation
 /// - Expression language for dynamic content
 /// - Integrity verification
+/// - Port contracts for inter-package communication
 library mcp_bundle;
 
 // Models
@@ -48,3 +49,9 @@ export 'src/validator/validation_result.dart';
 // Utils
 export 'src/utils/canonicalization.dart';
 export 'src/utils/integrity.dart';
+
+// Ports (Contract Layer)
+export 'src/ports/llm_port.dart';
+export 'src/ports/storage_port.dart';
+export 'src/ports/metric_port.dart';
+export 'src/ports/event_port.dart';
