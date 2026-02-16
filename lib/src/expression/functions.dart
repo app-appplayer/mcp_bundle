@@ -312,7 +312,7 @@ class ExpressionFunctions {
 
   dynamic _slice(List<dynamic> args) {
     final list = args.firstOrNull;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     final start = args.length > 1 ? (args[1] as num).toInt() : 0;
     final end = args.length > 2 ? (args[2] as num).toInt() : list.length;
     return list.sublist(start.clamp(0, list.length), end.clamp(0, list.length));
@@ -320,27 +320,27 @@ class ExpressionFunctions {
 
   dynamic _reverse(List<dynamic> args) {
     final list = args.firstOrNull;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     return list.reversed.toList();
   }
 
   dynamic _sort(List<dynamic> args) {
     final list = args.firstOrNull;
-    if (list is! List) return [];
-    final sorted = List.from(list);
+    if (list is! List) return <dynamic>[];
+    final sorted = List<dynamic>.from(list);
     sorted.sort((a, b) => Comparable.compare(a as Comparable, b as Comparable));
     return sorted;
   }
 
   dynamic _unique(List<dynamic> args) {
     final list = args.firstOrNull;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     return list.toSet().toList();
   }
 
   dynamic _flatten(List<dynamic> args) {
     final list = args.firstOrNull;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     return _flattenDeep(list);
   }
 
@@ -359,7 +359,7 @@ class ExpressionFunctions {
   dynamic _map(List<dynamic> args) {
     final list = args.firstOrNull;
     final fn = args.length > 1 ? args[1] : null;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     if (fn is! Function) return list;
     return list.map((e) => Function.apply(fn, [e])).toList();
   }
@@ -367,7 +367,7 @@ class ExpressionFunctions {
   dynamic _filter(List<dynamic> args) {
     final list = args.firstOrNull;
     final fn = args.length > 1 ? args[1] : null;
-    if (list is! List) return [];
+    if (list is! List) return <dynamic>[];
     if (fn is! Function) return list;
     return list.where((e) => Function.apply(fn, [e]) == true).toList();
   }
@@ -431,7 +431,7 @@ class ExpressionFunctions {
   dynamic _groupBy(List<dynamic> args) {
     final list = args.firstOrNull;
     final key = args.length > 1 ? args[1] : null;
-    if (list is! List) return {};
+    if (list is! List) return <dynamic, dynamic>{};
     final result = <dynamic, List<dynamic>>{};
     for (final item in list) {
       dynamic k;
@@ -442,7 +442,7 @@ class ExpressionFunctions {
       } else {
         k = item;
       }
-      result.putIfAbsent(k, () => []).add(item);
+      result.putIfAbsent(k, () => <dynamic>[]).add(item);
     }
     return result;
   }
@@ -450,8 +450,8 @@ class ExpressionFunctions {
   dynamic _sortBy(List<dynamic> args) {
     final list = args.firstOrNull;
     final key = args.length > 1 ? args[1] : null;
-    if (list is! List) return [];
-    final sorted = List.from(list);
+    if (list is! List) return <dynamic>[];
+    final sorted = List<dynamic>.from(list);
     sorted.sort((a, b) {
       dynamic ka, kb;
       if (key is Function) {
@@ -472,14 +472,14 @@ class ExpressionFunctions {
   dynamic _pluck(List<dynamic> args) {
     final list = args.firstOrNull;
     final key = args.length > 1 ? args[1] : null;
-    if (list is! List || key == null) return [];
+    if (list is! List || key == null) return <dynamic>[];
     return list.map((e) => (e is Map) ? e[key] : null).toList();
   }
 
   dynamic _zip(List<dynamic> args) {
-    if (args.isEmpty) return [];
-    final lists = args.whereType<List>().toList();
-    if (lists.isEmpty) return [];
+    if (args.isEmpty) return <dynamic>[];
+    final lists = args.whereType<List<dynamic>>().toList();
+    if (lists.isEmpty) return <dynamic>[];
     final minLen = lists.map((l) => l.length).reduce(math.min);
     final result = <List<dynamic>>[];
     for (var i = 0; i < minLen; i++) {
@@ -494,7 +494,7 @@ class ExpressionFunctions {
     final step = args.length > 2 ? (args[2] as num).toInt() : 1;
     final actualStart = args.length > 1 ? start : 0;
     final actualEnd = args.length > 1 ? end : start;
-    if (step == 0) return [];
+    if (step == 0) return <int>[];
     final result = <int>[];
     if (step > 0) {
       for (var i = actualStart; i < actualEnd; i += step) {
@@ -511,25 +511,25 @@ class ExpressionFunctions {
   // Object functions
   dynamic _keys(List<dynamic> args) {
     final obj = args.firstOrNull;
-    if (obj is! Map) return [];
+    if (obj is! Map) return <dynamic>[];
     return obj.keys.toList();
   }
 
   dynamic _values(List<dynamic> args) {
     final obj = args.firstOrNull;
-    if (obj is! Map) return [];
+    if (obj is! Map) return <dynamic>[];
     return obj.values.toList();
   }
 
   dynamic _entries(List<dynamic> args) {
     final obj = args.firstOrNull;
-    if (obj is! Map) return [];
+    if (obj is! Map) return <dynamic>[];
     return obj.entries.map((e) => [e.key, e.value]).toList();
   }
 
   dynamic _fromEntries(List<dynamic> args) {
     final entries = args.firstOrNull;
-    if (entries is! List) return {};
+    if (entries is! List) return <dynamic, dynamic>{};
     final result = <dynamic, dynamic>{};
     for (final entry in entries) {
       if (entry is List && entry.length >= 2) {
@@ -551,8 +551,8 @@ class ExpressionFunctions {
 
   dynamic _pick(List<dynamic> args) {
     final obj = args.firstOrNull;
-    final keys = args.length > 1 ? args.sublist(1) : [];
-    if (obj is! Map) return {};
+    final keys = args.length > 1 ? args.sublist(1) : <dynamic>[];
+    if (obj is! Map) return <dynamic, dynamic>{};
     final result = <dynamic, dynamic>{};
     for (final key in keys) {
       if (obj.containsKey(key)) {
@@ -565,7 +565,7 @@ class ExpressionFunctions {
   dynamic _omit(List<dynamic> args) {
     final obj = args.firstOrNull;
     final keys = args.length > 1 ? args.sublist(1).toSet() : <dynamic>{};
-    if (obj is! Map) return {};
+    if (obj is! Map) return <dynamic, dynamic>{};
     final result = <dynamic, dynamic>{};
     for (final entry in obj.entries) {
       if (!keys.contains(entry.key)) {
@@ -652,8 +652,8 @@ class ExpressionFunctions {
     if (val is List) return val;
     if (val is Map) return val.values.toList();
     if (val is String) return val.split('');
-    if (val == null) return [];
-    return [val];
+    if (val == null) return <dynamic>[];
+    return <dynamic>[val];
   }
 
   // Date functions
@@ -806,7 +806,7 @@ class ExpressionFunctions {
 
   dynamic _format(List<dynamic> args) {
     final template = args.firstOrNull?.toString() ?? '';
-    final values = args.length > 1 ? args.sublist(1) : [];
+    final values = args.length > 1 ? args.sublist(1) : <dynamic>[];
     var result = template;
     for (var i = 0; i < values.length; i++) {
       result = result.replaceAll('{$i}', values[i]?.toString() ?? '');

@@ -107,7 +107,7 @@ void main() {
       const tool = LlmTool(
         name: 'get_weather',
         description: 'Get weather info',
-        parameters: {'type': 'object', 'properties': {}},
+        parameters: {'type': 'object', 'properties': <String, dynamic>{}},
       );
       final json = tool.toJson();
       expect(json['name'], equals('get_weather'));
@@ -275,7 +275,7 @@ void main() {
         timestamp: DateTime.now(),
       ));
 
-      await Future.delayed(const Duration(milliseconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
 
       expect(events.length, equals(1));
       expect(events.first.payload['n'], equals(1));
