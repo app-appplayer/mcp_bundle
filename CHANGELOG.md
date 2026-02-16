@@ -1,4 +1,4 @@
-## [0.2.0] - Channel Port & Port Contracts
+## [0.2.1] - Channel Port & Port Contracts
 
 ### Added
 
@@ -54,49 +54,6 @@ Universal bidirectional communication interface for the MCP ecosystem.
 - **Stub Implementations**
   - `StubChannelPort` for testing with event simulation
   - `EchoChannelPort` for echo-back testing
-
-### Usage
-
-Implementations across MCP packages:
-- `mcp_channel`: SlackChannelPort, TelegramChannelPort, DiscordChannelPort
-- `mcp_server`: HttpChannelPort, WebSocketChannelPort, StdioChannelPort
-- `mcp_client`: HttpClientChannelPort, WebSocketClientChannelPort
-
-```dart
-import 'package:mcp_bundle/ports.dart';
-
-// Create event
-final event = ChannelEvent.message(
-  id: 'evt_123',
-  conversation: ConversationKey(
-    channel: ChannelIdentity(platform: 'slack', channelId: 'T123'),
-    conversationId: 'C456',
-  ),
-  text: 'Hello!',
-  userId: 'U123',
-);
-
-// Create response
-final response = ChannelResponse.text(
-  conversation: event.conversation,
-  text: 'Hi there!',
-  replyTo: event.id,
-);
-
-// Implement custom port
-class MyChannelPort implements ChannelPort {
-  @override
-  ChannelIdentity get identity => ChannelIdentity(
-    platform: 'custom',
-    channelId: 'my-channel',
-  );
-
-  @override
-  ChannelCapabilities get capabilities => ChannelCapabilities.textOnly();
-
-  // ... implement other methods
-}
-```
 
 ---
 
