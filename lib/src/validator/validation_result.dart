@@ -121,7 +121,7 @@ class ValidationError implements ValidationIssue {
   /// Create a required field error.
   factory ValidationError.required(String field, {String? location}) {
     return ValidationError(
-      code: 'REQUIRED_FIELD',
+      code: 'MISSING_REQUIRED',
       message: 'Required field "$field" is missing',
       location: location,
     );
@@ -150,7 +150,7 @@ class ValidationError implements ValidationIssue {
     String? location,
   }) {
     return ValidationError(
-      code: 'TYPE_MISMATCH',
+      code: 'INVALID_TYPE',
       message: 'Type mismatch for "$field": expected $expectedType, got $actualType',
       location: location,
     );
@@ -159,7 +159,7 @@ class ValidationError implements ValidationIssue {
   /// Create a reference error.
   factory ValidationError.unresolvedRef(String ref, {String? location}) {
     return ValidationError(
-      code: 'UNRESOLVED_REF',
+      code: 'UNKNOWN_REFERENCE',
       message: 'Unresolved reference: $ref',
       location: location,
     );
@@ -168,7 +168,7 @@ class ValidationError implements ValidationIssue {
   /// Create a duplicate error.
   factory ValidationError.duplicate(String field, String value, {String? location}) {
     return ValidationError(
-      code: 'DUPLICATE',
+      code: 'DUPLICATE_ID',
       message: 'Duplicate $field: $value',
       location: location,
     );
@@ -181,7 +181,7 @@ class ValidationError implements ValidationIssue {
     String? location,
   }) {
     return ValidationError(
-      code: 'CONSTRAINT_VIOLATION',
+      code: 'INVALID_VALUE',
       message: 'Constraint violation for "$field": $constraint',
       location: location,
     );

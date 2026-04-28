@@ -1,10 +1,9 @@
 name: mcp_bundle
 description: Bundle schema, loader, validator, expression language, and port contracts providing the foundation for the MCP ecosystem.
-version: 0.2.1
+version: 0.3.0
 homepage: https://app-appplayer.github.io/makemind
 repository: https://github.com/app-appplayer/mcp_bundle
 issue_tracker: https://github.com/app-appplayer/mcp_bundle/issues
-documentation: https://github.com/app-appplayer/mcp_bundle/wiki
 
 topics:
   - bundle
@@ -17,8 +16,10 @@ environment:
   sdk: ^3.0.0
 
 dependencies:
+  archive: ^3.6.0
   collection: ^1.18.0
   crypto: ^3.0.0
+  http: ^1.2.0
   json_annotation: ^4.8.1
   meta: ^1.9.0
 
@@ -36,6 +37,3 @@ platforms:
   macos:
   web:
   windows:
-
-funding:
-  - https://www.patreon.com/mcpdevstudio

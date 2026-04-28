@@ -33,6 +33,13 @@ enum TokenType {
   or,
   not,
 
+  // Membership and Pattern
+  inOperator,
+  matchesOperator,
+
+  // Null coalescing
+  nullCoalesce,
+
   // Delimiters
   leftParen,
   rightParen,
@@ -94,4 +101,6 @@ const Map<String, TokenType> keywords = {
   'and': TokenType.and,
   'or': TokenType.or,
   'not': TokenType.not,
+  'in': TokenType.inOperator,
+  'matches': TokenType.matchesOperator,
 };

@@ -242,7 +242,7 @@ enum TestType {
 /// Test step definition.
 class TestStep {
   /// Step action.
-  final StepAction action;
+  final TestStepAction action;
 
   /// Step configuration.
   final Map<String, dynamic> config;
@@ -258,7 +258,7 @@ class TestStep {
 
   factory TestStep.fromJson(Map<String, dynamic> json) {
     return TestStep(
-      action: StepAction.fromString(json['action'] as String? ?? 'execute'),
+      action: TestStepAction.fromString(json['action'] as String? ?? 'execute'),
       config: json['config'] as Map<String, dynamic>? ?? {},
       assertion: json['assertion'] != null
           ? TestAssertion.fromJson(json['assertion'] as Map<String, dynamic>)
@@ -276,7 +276,7 @@ class TestStep {
 }
 
 /// Step actions.
-enum StepAction {
+enum TestStepAction {
   execute,
   navigate,
   click,
@@ -287,16 +287,16 @@ enum StepAction {
   restore,
   unknown;
 
-  static StepAction fromString(String value) {
-    if (value == 'assert') return StepAction.assert_;
-    return StepAction.values.firstWhere(
+  static TestStepAction fromString(String value) {
+    if (value == 'assert') return TestStepAction.assert_;
+    return TestStepAction.values.firstWhere(
       (e) => e.name == value,
-      orElse: () => StepAction.unknown,
+      orElse: () => TestStepAction.unknown,
     );
   }
 
   String get name {
-    if (this == StepAction.assert_) return 'assert';
+    if (this == TestStepAction.assert_) return 'assert';
     return toString().split('.').last;
   }
 }

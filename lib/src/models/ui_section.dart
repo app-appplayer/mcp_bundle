@@ -1,42 +1,88 @@
 /// UI Section model for MCP Bundle.
 ///
-/// Contains screen definitions, widgets, and UI configuration.
+/// The canonical representation of UI in a bundle is the on-disk
+/// `ui/` reserved folder, accessed through `BundleResources`
+/// (`bundle.uiResources.list/readJson/...`). Each `ui/<rel>.json` maps
+/// to a `ui://<rel>` MCP resource URI — the bundle is a filesystem
+/// snapshot of the URI space an MCP server would expose.
+///
+/// The typed fields (`pages`, `widgets`, `theme`, `navigation`,
+/// `state`) on this class are deprecated. They exist only as a
+/// forward-compat round-trip channel for legacy bundles whose
+/// `manifest.json` carries inline `ui` data. New bundle authoring
+/// tools must write content under `ui/` instead. Targeted for full
+/// removal in 0.6.0.
 library;
 
-/// UI section containing screens and widgets.
+/// UI section. Typed fields are deprecated; consumers must read the
+/// `ui/` reserved folder via `BundleResources`. The original `ui:`
+/// JSON map is preserved verbatim under [raw] so `toJson` round-trips.
 class UiSection {
   /// Schema version for UI section.
   final String schemaVersion;
 
-  /// List of screens in the application.
-  final List<ScreenDefinition> screens;
+  /// List of pages in the application.
+  ///
+  /// Deprecated: read `ui/<rel>.json` files via `BundleResources`
+  /// instead of consulting this typed list.
+  @Deprecated(
+    'Read ui/ folder via BundleResources. UiSection typed fields '
+    'remain only for forward-compat round-trip. Removal target 0.6.0.',
+  )
+  final List<PageDefinition> pages;
 
   /// Reusable widget definitions.
+  @Deprecated(
+    'Read ui/ folder via BundleResources. UiSection typed fields '
+    'remain only for forward-compat round-trip. Removal target 0.6.0.',
+  )
   final Map<String, WidgetDefinition> widgets;
 
   /// Theme configuration.
+  @Deprecated(
+    'Read ui/ folder via BundleResources. UiSection typed fields '
+    'remain only for forward-compat round-trip. Removal target 0.6.0.',
+  )
   final ThemeConfig? theme;
 
   /// Navigation configuration.
+  @Deprecated(
+    'Read ui/ folder via BundleResources. UiSection typed fields '
+    'remain only for forward-compat round-trip. Removal target 0.6.0.',
+  )
   final NavigationConfig? navigation;
 
   /// Global UI state definitions.
+  @Deprecated(
+    'Read ui/ folder via BundleResources. UiSection typed fields '
+    'remain only for forward-compat round-trip. Removal target 0.6.0.',
+  )
   final Map<String, StateDefinition> state;
 
+  /// The original `ui:` JSON map preserved verbatim for round-trip
+  /// safety. `fromJson` populates this from the raw input;
+  /// `toJson` re-emits it (instead of the deprecated typed fields)
+  /// so unknown keys and ordering survive a load/save cycle.
+  final Map<String, dynamic> raw;
+
+  // ignore: deprecated_member_use_from_same_package
   const UiSection({
     this.schemaVersion = '1.0.0',
-    this.screens = const [],
+    this.pages = const [],
     this.widgets = const {},
     this.theme,
     this.navigation,
     this.state = const {},
+    this.raw = const {},
   });
 
   factory UiSection.fromJson(Map<String, dynamic> json) {
+    // Accept both 'pages' and 'screens' (backward compat) keys
+    final pagesList = json['pages'] ?? json['screens'];
     return UiSection(
       schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
-      screens: (json['screens'] as List<dynamic>?)
-              ?.map((e) => ScreenDefinition.fromJson(e as Map<String, dynamic>))
+      pages: (pagesList as List<dynamic>?)
+              ?.map((e) => PageDefinition.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       widgets: (json['widgets'] as Map<String, dynamic>?)?.map(
@@ -59,47 +105,62 @@ class UiSection {
             ),
           ) ??
           {},
+      raw: Map<String, dynamic>.unmodifiable(json),
     );
   }
 
+  /// Re-emits [raw] verbatim (the original input) so unknown keys and
+  /// ordering survive a load → toJson cycle. When [raw] is empty
+  /// (constructed in code), falls back to serialising the typed
+  /// fields for backward compatibility.
   Map<String, dynamic> toJson() {
+    if (raw.isNotEmpty) {
+      return Map<String, dynamic>.from(raw);
+    }
     return {
       'schemaVersion': schemaVersion,
-      if (screens.isNotEmpty) 'screens': screens.map((s) => s.toJson()).toList(),
+      // ignore: deprecated_member_use_from_same_package
+      if (pages.isNotEmpty) 'pages': pages.map((s) => s.toJson()).toList(),
+      // ignore: deprecated_member_use_from_same_package
       if (widgets.isNotEmpty)
+        // ignore: deprecated_member_use_from_same_package
         'widgets': widgets.map((k, v) => MapEntry(k, v.toJson())),
+      // ignore: deprecated_member_use_from_same_package
       if (theme != null) 'theme': theme!.toJson(),
+      // ignore: deprecated_member_use_from_same_package
       if (navigation != null) 'navigation': navigation!.toJson(),
+      // ignore: deprecated_member_use_from_same_package
       if (state.isNotEmpty)
+        // ignore: deprecated_member_use_from_same_package
         'state': state.map((k, v) => MapEntry(k, v.toJson())),
     };
   }
 }
 
-/// Screen definition.
-class ScreenDefinition {
-  /// Screen identifier.
+/// Page definition.
+class PageDefinition {
+  /// Page identifier.
   final String id;
 
-  /// Screen name.
+  /// Page name.
   final String name;
 
   /// Route path.
   final String? route;
 
-  /// Root widget for the screen.
+  /// Root widget for the page.
   final WidgetNode root;
 
-  /// Screen parameters.
+  /// Page parameters.
   final List<ParameterDef> parameters;
 
-  /// Screen-level state.
+  /// Page-level state.
   final Map<String, StateDefinition> state;
 
-  /// Screen lifecycle hooks.
+  /// Page lifecycle hooks.
   final LifecycleHooks? lifecycle;
 
-  const ScreenDefinition({
+  const PageDefinition({
     required this.id,
     required this.name,
     this.route,
@@ -109,8 +170,8 @@ class ScreenDefinition {
     this.lifecycle,
   });
 
-  factory ScreenDefinition.fromJson(Map<String, dynamic> json) {
-    return ScreenDefinition(
+  factory PageDefinition.fromJson(Map<String, dynamic> json) {
+    return PageDefinition(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       route: json['route'] as String?,
@@ -146,6 +207,9 @@ class ScreenDefinition {
     };
   }
 }
+
+/// Backward compatibility alias.
+typedef ScreenDefinition = PageDefinition;
 
 /// Widget node in the UI tree.
 class WidgetNode {
@@ -411,56 +475,65 @@ enum ActionType {
   }
 }
 
-/// Theme configuration.
+/// Theme configuration — bundle-side wrapper around the runtime theme JSON.
+///
+/// Holds the raw theme JSON (MCP UI DSL 1.3 — 14 token domains: color /
+/// typography / spacing / shape / elevation / motion / density / breakpoints
+/// / border / opacity / focusRing / zIndex / component, plus optional
+/// `light` / `dark` mode overrides) untouched, so the runtime can decode it
+/// via its strongly-typed `ThemeDefinition.fromJson`.
 class ThemeConfig {
-  /// Color scheme.
-  final Map<String, String> colors;
+  /// Theme mode — `light` / `dark` / `system`.
+  final String mode;
 
-  /// Typography settings.
-  final Map<String, dynamic> typography;
-
-  /// Spacing values.
-  final Map<String, double> spacing;
-
-  /// Border radius values.
-  final Map<String, double> borderRadius;
-
-  /// Dark mode configuration.
-  final Map<String, dynamic>? darkMode;
+  /// Per-domain theme JSON (the full 1.3 14-domain payload).
+  final Map<String, dynamic> raw;
 
   const ThemeConfig({
-    this.colors = const {},
-    this.typography = const {},
-    this.spacing = const {},
-    this.borderRadius = const {},
-    this.darkMode,
+    this.mode = 'system',
+    this.raw = const {},
   });
 
   factory ThemeConfig.fromJson(Map<String, dynamic> json) {
     return ThemeConfig(
-      colors: (json['colors'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, v.toString())) ??
-          {},
-      typography: json['typography'] as Map<String, dynamic>? ?? {},
-      spacing: (json['spacing'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, (v as num).toDouble())) ??
-          {},
-      borderRadius: (json['borderRadius'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, (v as num).toDouble())) ??
-          {},
-      darkMode: json['darkMode'] as Map<String, dynamic>?,
+      mode: (json['mode'] as String?) ?? 'system',
+      raw: Map<String, dynamic>.from(json),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      if (colors.isNotEmpty) 'colors': colors,
-      if (typography.isNotEmpty) 'typography': typography,
-      if (spacing.isNotEmpty) 'spacing': spacing,
-      if (borderRadius.isNotEmpty) 'borderRadius': borderRadius,
-      if (darkMode != null) 'darkMode': darkMode,
-    };
+    final m = Map<String, dynamic>.from(raw);
+    m['mode'] = mode;
+    return m;
   }
+
+  /// Convenience getter for the [color] sub-domain (M3 28-role).
+  Map<String, dynamic>? get color =>
+      raw['color'] as Map<String, dynamic>?;
+
+  /// Convenience getter for the [typography] sub-domain (M3 15-role).
+  Map<String, dynamic>? get typography =>
+      raw['typography'] as Map<String, dynamic>?;
+
+  /// Convenience getter for the [spacing] sub-domain.
+  Map<String, dynamic>? get spacing =>
+      raw['spacing'] as Map<String, dynamic>?;
+
+  /// Convenience getter for the [shape] sub-domain (M3 7-family).
+  Map<String, dynamic>? get shape =>
+      raw['shape'] as Map<String, dynamic>?;
+
+  /// Convenience getter for the [elevation] sub-domain (M3 6-level).
+  Map<String, dynamic>? get elevation =>
+      raw['elevation'] as Map<String, dynamic>?;
+
+  /// Mode-specific override for `dark`.
+  Map<String, dynamic>? get dark =>
+      raw['dark'] as Map<String, dynamic>?;
+
+  /// Mode-specific override for `light`.
+  Map<String, dynamic>? get light =>
+      raw['light'] as Map<String, dynamic>?;
 }
 
 /// Navigation configuration.
@@ -530,22 +603,22 @@ class RouteDefinition {
   /// Route path.
   final String path;
 
-  /// Target screen ID.
-  final String screenId;
+  /// Target page ID.
+  final String pageId;
 
   /// Route parameters.
   final List<ParameterDef> parameters;
 
   const RouteDefinition({
     required this.path,
-    required this.screenId,
+    required this.pageId,
     this.parameters = const [],
   });
 
   factory RouteDefinition.fromJson(Map<String, dynamic> json) {
     return RouteDefinition(
       path: json['path'] as String? ?? '',
-      screenId: json['screenId'] as String? ?? json['screen'] as String? ?? '',
+      pageId: json['pageId'] as String? ?? json['screenId'] as String? ?? json['screen'] as String? ?? '',
       parameters: (json['parameters'] as List<dynamic>?)
               ?.map((e) => ParameterDef.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -556,7 +629,7 @@ class RouteDefinition {
   Map<String, dynamic> toJson() {
     return {
       'path': path,
-      'screenId': screenId,
+      'pageId': pageId,
       if (parameters.isNotEmpty)
         'parameters': parameters.map((p) => p.toJson()).toList(),
     };
@@ -608,16 +681,16 @@ class NavigationGuard {
 
 /// Lifecycle hooks.
 class LifecycleHooks {
-  /// Called when screen is created.
+  /// Called when page is created.
   final List<ActionDef> onCreate;
 
-  /// Called when screen is shown.
+  /// Called when page is shown.
   final List<ActionDef> onShow;
 
-  /// Called when screen is hidden.
+  /// Called when page is hidden.
   final List<ActionDef> onHide;
 
-  /// Called when screen is destroyed.
+  /// Called when page is destroyed.
   final List<ActionDef> onDestroy;
 
   const LifecycleHooks({

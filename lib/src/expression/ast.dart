@@ -23,6 +23,7 @@ abstract class ExprVisitor<T> {
   T visitMember(MemberExpr expr);
   T visitIndex(IndexExpr expr);
   T visitConditional(ConditionalExpr expr);
+  T visitNullCoalesce(NullCoalesceExpr expr);
   T visitArray(ArrayExpr expr);
   T visitObject(ObjectExpr expr);
   T visitInterpolation(InterpolationExpr expr);
@@ -173,6 +174,20 @@ class ConditionalExpr extends Expr {
 
   @override
   String toString() => 'Conditional($condition ? $thenBranch : $elseBranch)';
+}
+
+/// Null coalescing expression (left ?? right).
+class NullCoalesceExpr extends Expr {
+  final Expr left;
+  final Expr right;
+
+  const NullCoalesceExpr(this.left, this.right);
+
+  @override
+  T accept<T>(ExprVisitor<T> visitor) => visitor.visitNullCoalesce(this);
+
+  @override
+  String toString() => 'NullCoalesce($left ?? $right)';
 }
 
 /// Array literal expression.

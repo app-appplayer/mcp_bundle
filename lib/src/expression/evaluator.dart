@@ -120,8 +120,49 @@ class ExpressionEvaluator implements ExprVisitor<dynamic> {
       case '>=':
         return _compare(left, right) >= 0;
 
+      // Membership operators
+      case 'in':
+        return _evaluateIn(left, right);
+
+      case 'matches':
+        return _evaluateMatches(left, right);
+
       default:
         throw EvaluationException('Unknown binary operator: $op');
+    }
+  }
+
+  /// Evaluate 'in' operator for membership checking.
+  bool _evaluateIn(dynamic element, dynamic collection) {
+    if (collection == null) return false;
+
+    if (collection is List) {
+      return collection.contains(element);
+    }
+
+    if (collection is Map) {
+      return collection.containsKey(element);
+    }
+
+    if (collection is String && element is String) {
+      return collection.contains(element);
+    }
+
+    return false;
+  }
+
+  /// Evaluate 'matches' operator for regex matching.
+  bool _evaluateMatches(dynamic value, dynamic pattern) {
+    if (value == null || pattern == null) return false;
+
+    final stringValue = value.toString();
+    final patternString = pattern.toString();
+
+    try {
+      final regex = RegExp(patternString);
+      return regex.hasMatch(stringValue);
+    } catch (e) {
+      throw EvaluationException('Invalid regex pattern: $patternString');
     }
   }
 
@@ -151,6 +192,13 @@ class ExpressionEvaluator implements ExprVisitor<dynamic> {
     return condition
         ? expr.thenBranch.accept(this)
         : expr.elseBranch.accept(this);
+  }
+
+  @override
+  dynamic visitNullCoalesce(NullCoalesceExpr expr) {
+    final left = expr.left.accept(this);
+    if (left != null) return left;
+    return expr.right.accept(this);
   }
 
   @override

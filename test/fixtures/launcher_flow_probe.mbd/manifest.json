@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifest": {
+    "id": "com.example.launcher_flow",
+    "name": "Launcher Flow Probe",
+    "version": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "type": "application",
+    "entryPoint": "ui.main"
+  },
+  "ui": {
+    "schemaVersion": "1.0.0",
+    "pages": [
+      {
+        "id": "main",
+        "name": "Main",
+        "route": "/",
+        "root": {
+          "type": "box",
+          "children": []
+        }
+      }
+    ]
+  }
+}

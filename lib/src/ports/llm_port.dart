@@ -7,6 +7,8 @@ library;
 
 import 'dart:convert';
 
+import '../types/context_bundle.dart' show ContextBundle;
+
 /// LLM capabilities configuration.
 class LlmCapabilities {
   /// Whether completion is supported (always true).
@@ -27,6 +29,9 @@ class LlmCapabilities {
   /// Whether audio input is supported.
   final bool audio;
 
+  /// Whether retrieval-augmented generation is supported.
+  final bool rag;
+
   /// Maximum context window size in tokens.
   final int? maxContextTokens;
 
@@ -40,6 +45,7 @@ class LlmCapabilities {
     this.toolCalling = false,
     this.vision = false,
     this.audio = false,
+    this.rag = false,
     this.maxContextTokens,
     this.maxOutputTokens,
   });
@@ -50,8 +56,9 @@ class LlmCapabilities {
         streaming = true,
         embedding = true,
         toolCalling = true,
-        vision = false,
-        audio = false,
+        vision = true,
+        audio = true,
+        rag = true,
         maxContextTokens = null,
         maxOutputTokens = null;
 
@@ -63,6 +70,7 @@ class LlmCapabilities {
         toolCalling = false,
         vision = false,
         audio = false,
+        rag = false,
         maxContextTokens = null,
         maxOutputTokens = null;
 
@@ -75,6 +83,7 @@ class LlmCapabilities {
       toolCalling: json['toolCalling'] as bool? ?? false,
       vision: json['vision'] as bool? ?? false,
       audio: json['audio'] as bool? ?? false,
+      rag: json['rag'] as bool? ?? false,
       maxContextTokens: json['maxContextTokens'] as int?,
       maxOutputTokens: json['maxOutputTokens'] as int?,
     );
@@ -88,6 +97,7 @@ class LlmCapabilities {
         'toolCalling': toolCalling,
         'vision': vision,
         'audio': audio,
+        'rag': rag,
         if (maxContextTokens != null) 'maxContextTokens': maxContextTokens,
         if (maxOutputTokens != null) 'maxOutputTokens': maxOutputTokens,
       };
@@ -529,6 +539,8 @@ abstract class LlmPort {
         return capabilities.vision;
       case 'audio':
         return capabilities.audio;
+      case 'rag':
+        return capabilities.rag;
       default:
         return false;
     }
@@ -565,6 +577,17 @@ abstract class LlmPort {
     List<LlmTool> tools,
   ) {
     throw UnsupportedError('Tool calling not supported by this LLM');
+  }
+
+  /// RAG: Complete with pre-retrieved context (optional - check capabilities.rag).
+  ///
+  /// Consumer builds a [ContextBundle] via `ContextBundlePort` /
+  /// `RetrievalPort` first, then passes it here for grounded generation.
+  Future<LlmResponse> completeWithContext(
+    LlmRequest request,
+    ContextBundle context,
+  ) {
+    throw UnsupportedError('RAG not supported by this LLM');
   }
 }
 

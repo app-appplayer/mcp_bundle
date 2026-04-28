@@ -56,6 +56,42 @@ class BundleManifest {
   /// Additional metadata.
   final Map<String, dynamic> metadata;
 
+  /// App icon asset reference (asset ID or URL).
+  final String? icon;
+
+  /// Splash screen configuration.
+  final SplashConfig? splash;
+
+  /// Preview image references.
+  final List<String> screenshots;
+
+  /// Structured app category.
+  final AppCategory? category;
+
+  /// Publisher details.
+  final PublisherInfo? publisher;
+
+  /// Bundle creation timestamp.
+  final DateTime? createdAt;
+
+  /// Last update timestamp.
+  final DateTime? updatedAt;
+
+  /// Publication timestamp.
+  final DateTime? publishedAt;
+
+  /// Minimum AppPlayer/runtime version required.
+  final String? minRuntimeVersion;
+
+  /// Localized name/description per locale.
+  final Map<String, LocalizedInfo>? localization;
+
+  /// Age rating (e.g. "everyone", "teen", "mature").
+  final String? ageRating;
+
+  /// Privacy policy URL.
+  final String? privacyPolicy;
+
   const BundleManifest({
     required this.id,
     required this.name,
@@ -73,6 +109,18 @@ class BundleManifest {
     this.dependencies = const [],
     this.platform,
     this.metadata = const {},
+    this.icon,
+    this.splash,
+    this.screenshots = const [],
+    this.category,
+    this.publisher,
+    this.createdAt,
+    this.updatedAt,
+    this.publishedAt,
+    this.minRuntimeVersion,
+    this.localization,
+    this.ageRating,
+    this.privacyPolicy,
   });
 
   /// Create from JSON.
@@ -100,6 +148,24 @@ class BundleManifest {
               json['platform'] as Map<String, dynamic>)
           : null,
       metadata: json['metadata'] as Map<String, dynamic>? ?? {},
+      icon: json['icon'] as String?,
+      splash: json['splash'] != null
+          ? SplashConfig.fromJson(json['splash'] as Map<String, dynamic>)
+          : null,
+      screenshots: _parseStringList(json['screenshots']),
+      category: json['category'] != null
+          ? AppCategory.fromString(json['category'] as String)
+          : null,
+      publisher: json['publisher'] != null
+          ? PublisherInfo.fromJson(json['publisher'] as Map<String, dynamic>)
+          : null,
+      createdAt: _parseDateTime(json['createdAt']),
+      updatedAt: _parseDateTime(json['updatedAt']),
+      publishedAt: _parseDateTime(json['publishedAt']),
+      minRuntimeVersion: json['minRuntimeVersion'] as String?,
+      localization: _parseLocalizationMap(json['localization']),
+      ageRating: json['ageRating'] as String?,
+      privacyPolicy: json['privacyPolicy'] as String?,
     );
   }
 
@@ -123,6 +189,19 @@ class BundleManifest {
         'dependencies': dependencies.map((d) => d.toJson()).toList(),
       if (platform != null) 'platform': platform!.toJson(),
       if (metadata.isNotEmpty) 'metadata': metadata,
+      if (icon != null) 'icon': icon,
+      if (splash != null) 'splash': splash!.toJson(),
+      if (screenshots.isNotEmpty) 'screenshots': screenshots,
+      if (category != null) 'category': category!.name,
+      if (publisher != null) 'publisher': publisher!.toJson(),
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+      if (publishedAt != null) 'publishedAt': publishedAt!.toIso8601String(),
+      if (minRuntimeVersion != null) 'minRuntimeVersion': minRuntimeVersion,
+      if (localization != null)
+        'localization': localization!.map((k, v) => MapEntry(k, v.toJson())),
+      if (ageRating != null) 'ageRating': ageRating,
+      if (privacyPolicy != null) 'privacyPolicy': privacyPolicy,
     };
   }
 
@@ -144,6 +223,18 @@ class BundleManifest {
     List<BundleDependency>? dependencies,
     PlatformRequirements? platform,
     Map<String, dynamic>? metadata,
+    String? icon,
+    SplashConfig? splash,
+    List<String>? screenshots,
+    AppCategory? category,
+    PublisherInfo? publisher,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? publishedAt,
+    String? minRuntimeVersion,
+    Map<String, LocalizedInfo>? localization,
+    String? ageRating,
+    String? privacyPolicy,
   }) {
     return BundleManifest(
       id: id ?? this.id,
@@ -162,6 +253,18 @@ class BundleManifest {
       dependencies: dependencies ?? this.dependencies,
       platform: platform ?? this.platform,
       metadata: metadata ?? this.metadata,
+      icon: icon ?? this.icon,
+      splash: splash ?? this.splash,
+      screenshots: screenshots ?? this.screenshots,
+      category: category ?? this.category,
+      publisher: publisher ?? this.publisher,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      publishedAt: publishedAt ?? this.publishedAt,
+      minRuntimeVersion: minRuntimeVersion ?? this.minRuntimeVersion,
+      localization: localization ?? this.localization,
+      ageRating: ageRating ?? this.ageRating,
+      privacyPolicy: privacyPolicy ?? this.privacyPolicy,
     );
   }
 }
@@ -274,6 +377,192 @@ class PlatformRequirements {
   }
 }
 
+/// App categories for marketplace listing and categorization.
+enum AppCategory {
+  productivity,
+  education,
+  entertainment,
+  social,
+  business,
+  utilities,
+  health,
+  finance,
+  lifestyle,
+  news,
+  travel,
+  food,
+  sports,
+  music,
+  photo,
+  video,
+  communication,
+  developer,
+  reference,
+  other;
+
+  /// Parse from string, returning [other] for unrecognized values.
+  static AppCategory fromString(String value) {
+    return AppCategory.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => AppCategory.other,
+    );
+  }
+}
+
+/// Publisher identity information.
+class PublisherInfo {
+  /// Publisher display name (required).
+  final String name;
+
+  /// Publisher logo asset reference or URL.
+  final String? logo;
+
+  /// Publisher website URL.
+  final String? url;
+
+  /// Contact email.
+  final String? email;
+
+  const PublisherInfo({
+    required this.name,
+    this.logo,
+    this.url,
+    this.email,
+  });
+
+  factory PublisherInfo.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] as String?;
+    if (name == null || name.isEmpty) {
+      throw FormatException('PublisherInfo requires a non-empty "name" field');
+    }
+    return PublisherInfo(
+      name: name,
+      logo: json['logo'] as String?,
+      url: json['url'] as String?,
+      email: json['email'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      if (logo != null) 'logo': logo,
+      if (url != null) 'url': url,
+      if (email != null) 'email': email,
+    };
+  }
+
+  PublisherInfo copyWith({
+    String? name,
+    String? logo,
+    String? url,
+    String? email,
+  }) {
+    return PublisherInfo(
+      name: name ?? this.name,
+      logo: logo ?? this.logo,
+      url: url ?? this.url,
+      email: email ?? this.email,
+    );
+  }
+}
+
+/// Splash screen configuration.
+class SplashConfig {
+  /// Splash image asset reference or URL.
+  final String? image;
+
+  /// Background color as hex string (e.g. '#FFFFFF').
+  final String? backgroundColor;
+
+  /// Display duration in milliseconds.
+  final int? duration;
+
+  const SplashConfig({
+    this.image,
+    this.backgroundColor,
+    this.duration,
+  });
+
+  factory SplashConfig.fromJson(Map<String, dynamic> json) {
+    return SplashConfig(
+      image: json['image'] as String?,
+      backgroundColor: json['backgroundColor'] as String?,
+      duration: json['duration'] as int?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (image != null) 'image': image,
+      if (backgroundColor != null) 'backgroundColor': backgroundColor,
+      if (duration != null) 'duration': duration,
+    };
+  }
+
+  SplashConfig copyWith({
+    String? image,
+    String? backgroundColor,
+    int? duration,
+  }) {
+    return SplashConfig(
+      image: image ?? this.image,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      duration: duration ?? this.duration,
+    );
+  }
+}
+
+/// Localized name, description, and icon for a specific locale.
+class LocalizedInfo {
+  /// Localized app name (required).
+  final String name;
+
+  /// Localized description.
+  final String? description;
+
+  /// Locale-specific icon override.
+  final String? icon;
+
+  const LocalizedInfo({
+    required this.name,
+    this.description,
+    this.icon,
+  });
+
+  factory LocalizedInfo.fromJson(Map<String, dynamic> json) {
+    final name = json['name'] as String?;
+    if (name == null || name.isEmpty) {
+      throw FormatException('LocalizedInfo requires a non-empty "name" field');
+    }
+    return LocalizedInfo(
+      name: name,
+      description: json['description'] as String?,
+      icon: json['icon'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      if (description != null) 'description': description,
+      if (icon != null) 'icon': icon,
+    };
+  }
+
+  LocalizedInfo copyWith({
+    String? name,
+    String? description,
+    String? icon,
+  }) {
+    return LocalizedInfo(
+      name: name ?? this.name,
+      description: description ?? this.description,
+      icon: icon ?? this.icon,
+    );
+  }
+}
+
 /// Helper to parse string lists from JSON.
 List<String> _parseStringList(dynamic value) {
   if (value == null) return [];
@@ -281,4 +570,24 @@ List<String> _parseStringList(dynamic value) {
     return value.map((e) => e.toString()).toList();
   }
   return [];
+}
+
+/// Helper to parse DateTime from JSON (ISO 8601 string).
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is String) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
+
+/// Helper to parse localization map from JSON.
+Map<String, LocalizedInfo>? _parseLocalizationMap(dynamic value) {
+  if (value == null) return null;
+  if (value is Map<String, dynamic>) {
+    return value.map(
+      (k, v) => MapEntry(k, LocalizedInfo.fromJson(v as Map<String, dynamic>)),
+    );
+  }
+  return null;
 }

@@ -1,3 +1,21 @@
+## [0.3.0] - 2026-04-28 - Standard Port Catalog & Install Pipeline
+
+### Added
+- **Standard Port Catalog (40+ ports)** — capability-named contracts spanning UI/Form, IO devices, Knowledge (facts, entities, claims, evidence, candidates, summaries, patterns, index, retrieval), Profile (appraisal, decision, expression, summaries), Skill (registry, runtime), Ops (workflow, pipeline, runbook, runs, schedule trigger), Philosophy (ethos store, philosophy), Analysis (function, datasource), and shared services (mcp, metrics, notification, audit, approval, asset, flow, ingest).
+- **Bundle install / sign / pack subsystem** (`lib/src/install/`) — BundleSigner, BundlePacker, BundleInstaller, InstallPolicy, TrustStore, RuntimeDescriptor.
+- **Bundle storage subsystem** (`lib/src/io/`) — BundleStoragePort with File / HTTP / Memory adapters, BundleRepository, BundleResources, type coercion utilities.
+- Profile and Skill model packages, fact-graph schema/section, integrity, and policy models.
+
+### Changed
+- Expression engine split into lexer / parser / AST / evaluator / functions modules.
+- Manifest and UI section: `ui/` reserved folder is now canonical; UiSection typed fields deprecated (round-trip only, removal targeted for 0.6.0).
+- LLM port refined.
+
+### Removed
+- `lib/src/loader/` legacy loader — replaced by `lib/src/io/` storage subsystem.
+
+---
+
 ## [0.2.1] - Channel Port & Port Contracts
 
 ### Added
@@ -111,11 +129,3 @@ Universal bidirectional communication interface for the MCP ecosystem.
 - Nested property access
 - Function calls
 
----
-
-## Support and Contributing
-
-- [Report Issues](https://github.com/app-appplayer/mcp_bundle/issues)
-- [Join Discussions](https://github.com/app-appplayer/mcp_bundle/discussions)
-- [Read Documentation](https://github.com/app-appplayer/mcp_bundle/wiki)
-- [Support Development](https://www.patreon.com/mcpdevstudio)

@@ -6,6 +6,7 @@ library;
 
 /// Period unit for relative periods.
 enum PeriodUnit {
+  minutes,
   hours,
   days,
   weeks,
@@ -21,6 +22,26 @@ enum PeriodUnit {
   }
 }
 
+/// Direction of relative period from reference time.
+enum PeriodDirection {
+  /// Period extends into the past (default).
+  past,
+
+  /// Period extends into the future.
+  future,
+
+  /// Period extends both directions (centered on reference).
+  around;
+
+  /// Parse from string.
+  static PeriodDirection fromString(String value) {
+    return PeriodDirection.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+      orElse: () => PeriodDirection.past,
+    );
+  }
+}
+
 /// Base class for Period types.
 sealed class Period {
   const Period();
@@ -29,6 +50,7 @@ sealed class Period {
   const factory Period.relative({
     required PeriodUnit unit,
     required int value,
+    PeriodDirection direction,
   }) = RelativePeriod;
 
   /// Create an absolute period.
@@ -57,17 +79,30 @@ sealed class Period {
   DateRange resolve([DateTime? referenceTime]);
 }
 
-/// Relative period - a duration from reference time backwards.
+/// Relative period - a duration from reference time.
+///
+/// By default, extends into the past. Use [direction] to change this:
+/// - [PeriodDirection.past]: "last N units" (default)
+/// - [PeriodDirection.future]: "next N units"
+/// - [PeriodDirection.around]: "N units before and after"
 class RelativePeriod extends Period {
   final PeriodUnit unit;
   final int value;
+  final PeriodDirection direction;
 
-  const RelativePeriod({required this.unit, required this.value});
+  const RelativePeriod({
+    required this.unit,
+    required this.value,
+    this.direction = PeriodDirection.past,
+  });
 
   factory RelativePeriod.fromJson(Map<String, dynamic> json) {
     return RelativePeriod(
       unit: PeriodUnit.fromString(json['unit'] as String),
       value: json['value'] as int,
+      direction: json['direction'] != null
+          ? PeriodDirection.fromString(json['direction'] as String)
+          : PeriodDirection.past,
     );
   }
 
@@ -76,18 +111,49 @@ class RelativePeriod extends Period {
         'type': 'relative',
         'unit': unit.name,
         'value': value,
+        'direction': direction.name,
       };
 
   @override
   DateRange resolve([DateTime? referenceTime]) {
     final ref = referenceTime ?? DateTime.now();
-    final end = ref;
-    final start = _subtractDuration(ref);
-    return DateRange(start: start, end: end);
+
+    switch (direction) {
+      case PeriodDirection.past:
+        return DateRange(start: _subtractDuration(ref), end: ref);
+      case PeriodDirection.future:
+        return DateRange(start: ref, end: _addDuration(ref));
+      case PeriodDirection.around:
+        final halfValue = value ~/ 2;
+        final halfPeriod = RelativePeriod(unit: unit, value: halfValue);
+        return DateRange(
+          start: halfPeriod._subtractDuration(ref),
+          end: halfPeriod._addDuration(ref),
+        );
+    }
+  }
+
+  DateTime _addDuration(DateTime from) {
+    switch (unit) {
+      case PeriodUnit.minutes:
+        return from.add(Duration(minutes: value));
+      case PeriodUnit.hours:
+        return from.add(Duration(hours: value));
+      case PeriodUnit.days:
+        return from.add(Duration(days: value));
+      case PeriodUnit.weeks:
+        return from.add(Duration(days: value * 7));
+      case PeriodUnit.months:
+        return DateTime(from.year, from.month + value, from.day);
+      case PeriodUnit.years:
+        return DateTime(from.year + value, from.month, from.day);
+    }
   }
 
   DateTime _subtractDuration(DateTime from) {
     switch (unit) {
+      case PeriodUnit.minutes:
+        return from.subtract(Duration(minutes: value));
       case PeriodUnit.hours:
         return from.subtract(Duration(hours: value));
       case PeriodUnit.days:
@@ -102,15 +168,19 @@ class RelativePeriod extends Period {
   }
 
   @override
-  String toString() => 'RelativePeriod($value ${unit.name})';
+  String toString() =>
+      'RelativePeriod($value ${unit.name}, direction: ${direction.name})';
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RelativePeriod && unit == other.unit && value == other.value;
+      other is RelativePeriod &&
+          unit == other.unit &&
+          value == other.value &&
+          direction == other.direction;
 
   @override
-  int get hashCode => Object.hash(unit, value);
+  int get hashCode => Object.hash(unit, value, direction);
 }
 
 /// Absolute period - a fixed date range.

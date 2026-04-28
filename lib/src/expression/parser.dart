@@ -23,9 +23,11 @@ class ParserException implements Exception {
 /// Grammar (EBNF):
 /// ```
 /// expression     → conditional
-/// conditional    → logicalOr ( "?" expression ":" expression )?
+/// conditional    → nullCoalesce ( "?" expression ":" expression )?
+/// nullCoalesce   → logicalOr ( "??" nullCoalesce )?
 /// logicalOr      → logicalAnd ( ( "||" | "or" ) logicalAnd )*
-/// logicalAnd     → equality ( ( "&&" | "and" ) equality )*
+/// logicalAnd     → membership ( ( "&&" | "and" ) membership )*
+/// membership     → equality ( ( "in" | "matches" ) equality )*
 /// equality       → comparison ( ( "==" | "!=" ) comparison )*
 /// comparison     → term ( ( "<" | "<=" | ">" | ">=" ) term )*
 /// term           → factor ( ( "+" | "-" ) factor )*
@@ -65,13 +67,24 @@ class Parser {
   Expr _expression() => _conditional();
 
   Expr _conditional() {
-    var expr = _logicalOr();
+    var expr = _nullCoalesce();
 
     if (_match([TokenType.question])) {
       final thenBranch = _expression();
       _consume(TokenType.colon, "Expected ':' in conditional expression");
       final elseBranch = _expression();
       expr = ConditionalExpr(expr, thenBranch, elseBranch);
+    }
+
+    return expr;
+  }
+
+  Expr _nullCoalesce() {
+    var expr = _logicalOr();
+
+    if (_match([TokenType.nullCoalesce])) {
+      final right = _nullCoalesce();
+      expr = NullCoalesceExpr(expr, right);
     }
 
     return expr;
@@ -90,12 +103,24 @@ class Parser {
   }
 
   Expr _logicalAnd() {
-    var expr = _equality();
+    var expr = _membership();
 
     while (_match([TokenType.and])) {
       final operator = _previous();
-      final right = _equality();
+      final right = _membership();
       expr = LogicalExpr(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  Expr _membership() {
+    var expr = _equality();
+
+    while (_match([TokenType.inOperator, TokenType.matchesOperator])) {
+      final operator = _previous();
+      final right = _equality();
+      expr = BinaryExpr(expr, operator, right);
     }
 
     return expr;

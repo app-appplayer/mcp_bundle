@@ -87,6 +87,8 @@ class Lexer {
       case '?':
         if (_match('.')) {
           _addToken(TokenType.questionDot);
+        } else if (_match('?')) {
+          _addToken(TokenType.nullCoalesce);
         } else {
           _addToken(TokenType.question);
         }
@@ -209,6 +211,8 @@ class Lexer {
               buffer.write('"');
             case "'":
               buffer.write("'");
+            case '\$':
+              buffer.write('\$');
             default:
               buffer.write(escaped);
           }

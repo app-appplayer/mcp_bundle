@@ -124,9 +124,11 @@ class ExpressionFunctions {
     _functions['parseDate'] = _parseDate;
     _functions['formatDate'] = _formatDate;
     _functions['addDays'] = _addDays;
+    _functions['addHours'] = _addHours;
     _functions['addMonths'] = _addMonths;
     _functions['addYears'] = _addYears;
     _functions['diffDays'] = _diffDays;
+    _functions['diffHours'] = _diffHours;
     _functions['year'] = _year;
     _functions['month'] = _month;
     _functions['day'] = _day;
@@ -134,6 +136,20 @@ class ExpressionFunctions {
     _functions['minute'] = _minute;
     _functions['second'] = _second;
     _functions['dayOfWeek'] = _dayOfWeek;
+    _functions['age'] = _age;
+    _functions['duration'] = _duration;
+
+    // Function aliases
+    _functions['distinct'] = _unique;
+    _functions['date'] = _parseDate;
+    _functions['daysBetween'] = _diffDays;
+
+    // Context functions (for runtime integration)
+    _functions['fact'] = _fact;
+    _functions['facts'] = _facts;
+    _functions['entity'] = _entity;
+    _functions['summary'] = _summary;
+    _functions['stepResult'] = _stepResult;
 
     // Utility functions
     _functions['coalesce'] = _coalesce;
@@ -698,6 +714,15 @@ class ExpressionFunctions {
     return date.add(Duration(days: days)).toIso8601String();
   }
 
+  dynamic _addHours(List<dynamic> args) {
+    final dateStr = args.firstOrNull?.toString();
+    final hours = args.length > 1 ? (args[1] as num).toInt() : 0;
+    if (dateStr == null) return null;
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return null;
+    return date.add(Duration(hours: hours)).toIso8601String();
+  }
+
   dynamic _addMonths(List<dynamic> args) {
     final dateStr = args.firstOrNull?.toString();
     final months = args.length > 1 ? (args[1] as num).toInt() : 0;
@@ -724,6 +749,16 @@ class ExpressionFunctions {
     final date2 = DateTime.tryParse(date2Str);
     if (date1 == null || date2 == null) return null;
     return date1.difference(date2).inDays;
+  }
+
+  dynamic _diffHours(List<dynamic> args) {
+    final date1Str = args.firstOrNull?.toString();
+    final date2Str = args.length > 1 ? args[1].toString() : null;
+    if (date1Str == null || date2Str == null) return null;
+    final date1 = DateTime.tryParse(date1Str);
+    final date2 = DateTime.tryParse(date2Str);
+    if (date1 == null || date2 == null) return null;
+    return date1.difference(date2).inHours;
   }
 
   dynamic _year(List<dynamic> args) {
@@ -766,6 +801,89 @@ class ExpressionFunctions {
     final dateStr = args.firstOrNull?.toString();
     if (dateStr == null) return null;
     return DateTime.tryParse(dateStr)?.weekday;
+  }
+
+  dynamic _age(List<dynamic> args) {
+    final birthDateStr = args.firstOrNull?.toString();
+    if (birthDateStr == null) return null;
+    final birthDate = DateTime.tryParse(birthDateStr);
+    if (birthDate == null) return null;
+
+    final now = DateTime.now();
+    var age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  dynamic _duration(List<dynamic> args) {
+    final date1Str = args.firstOrNull?.toString();
+    final date2Str = args.length > 1 ? args[1].toString() : null;
+    final unit = args.length > 2 ? args[2].toString() : 'days';
+
+    if (date1Str == null || date2Str == null) return null;
+    final date1 = DateTime.tryParse(date1Str);
+    final date2 = DateTime.tryParse(date2Str);
+    if (date1 == null || date2 == null) return null;
+
+    final diff = date1.difference(date2);
+
+    switch (unit) {
+      case 'days':
+        return diff.inDays;
+      case 'hours':
+        return diff.inHours;
+      case 'minutes':
+        return diff.inMinutes;
+      case 'seconds':
+        return diff.inSeconds;
+      case 'milliseconds':
+        return diff.inMilliseconds;
+      case 'weeks':
+        return diff.inDays ~/ 7;
+      case 'months':
+        return (date1.year - date2.year) * 12 + (date1.month - date2.month);
+      case 'years':
+        return date1.year - date2.year;
+      default:
+        return diff.inDays;
+    }
+  }
+
+  // Context functions (stubs for runtime integration)
+  // These functions require runtime context and are typically
+  // overridden by the runtime with actual implementations.
+
+  dynamic _fact(List<dynamic> args) {
+    // Stub: returns null, actual implementation provided by runtime
+    // fact(factId) -> returns single fact value
+    return null;
+  }
+
+  dynamic _facts(List<dynamic> args) {
+    // Stub: returns empty list, actual implementation provided by runtime
+    // facts(query) -> returns list of facts matching query
+    return <dynamic>[];
+  }
+
+  dynamic _entity(List<dynamic> args) {
+    // Stub: returns null, actual implementation provided by runtime
+    // entity(entityId) -> returns entity object
+    return null;
+  }
+
+  dynamic _summary(List<dynamic> args) {
+    // Stub: returns null, actual implementation provided by runtime
+    // summary(type) -> returns summary of specified type
+    return null;
+  }
+
+  dynamic _stepResult(List<dynamic> args) {
+    // Stub: returns null, actual implementation provided by runtime
+    // stepResult(stepId) -> returns result of previous step
+    return null;
   }
 
   // Utility functions
