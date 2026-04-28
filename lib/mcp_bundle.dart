@@ -64,7 +64,7 @@ export 'src/io/http_storage_adapter.dart';
 export 'src/io/bundle_repository.dart';
 export 'src/io/bundle_resources.dart';
 
-// Install Lifecycle — see docs/bundle_packaging_and_install.md
+// Install Lifecycle
 export 'src/install/install_policy.dart';
 export 'src/install/installed_bundle.dart';
 export 'src/install/runtime_descriptor.dart';

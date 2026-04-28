@@ -1,6 +1,4 @@
 /// Read/write access to the bundle's reserved sub-folders.
-///
-/// See `docs/bundle_resource_io.md` for the design contract.
 library;
 
 import 'dart:async';

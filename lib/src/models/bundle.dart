@@ -239,7 +239,7 @@ class McpBundle {
   bool get hasIntegrity => integrity != null && integrity!.isValid;
 
   // ---------------------------------------------------------------------------
-  // Reserved-folder I/O — see `docs/bundle_resource_io.md`.
+  // Reserved-folder I/O.
   //
   // mcp_bundle is the single owner of bundle file I/O. Every consumer
   // (renderer, MCP server, designer, installer) reads / writes through

@@ -4,7 +4,7 @@
 ///
 /// Contract under test: every consumer of a bundle (renderer, MCP
 /// server, designer, installer) goes through this surface instead of
-/// `dart:io` directly. See `docs/bundle_resource_io.md`.
+/// `dart:io` directly.
 library;
 
 import 'dart:io';
