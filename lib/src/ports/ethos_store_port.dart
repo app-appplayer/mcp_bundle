@@ -53,6 +53,37 @@ class EthosRecord {
     required this.createdAt,
     this.active = false,
   });
+
+  /// Construct from a JSON map. `payload` is preserved as-is. `active`
+  /// defaults to false when absent. `createdAt` parses ISO-8601 strings;
+  /// missing values fall back to `DateTime.now()` so corrupt records do
+  /// not crash callers (they surface as records with synthetic recency
+  /// — adapters should validate before re-persisting).
+  factory EthosRecord.fromJson(Map<String, dynamic> json) {
+    return EthosRecord(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      version: json['version'] as String? ?? '',
+      payload: Map<String, dynamic>.from(
+        (json['payload'] as Map?) ?? const {},
+      ),
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      active: json['active'] as bool? ?? false,
+    );
+  }
+
+  /// Serialize to JSON. `createdAt` round-trips as an ISO-8601 string so
+  /// adapters using `dart:convert` `jsonEncode` can persist directly.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'version': version,
+        'payload': payload,
+        'createdAt': createdAt.toIso8601String(),
+        'active': active,
+      };
 }
 
 /// Stub implementation for testing.

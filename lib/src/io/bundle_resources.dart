@@ -8,7 +8,7 @@ import 'dart:typed_data';
 
 import 'exceptions.dart';
 
-/// The six reserved folder names in a bundle's `.mbd/` tree.
+/// The seven reserved folder names in a bundle's `.mbd/` tree.
 ///
 /// Each name maps 1:1 to a sub-directory under the bundle root. Consumer
 /// adapters interpret the folder's contents in domain-specific ways
@@ -35,6 +35,9 @@ class BundleFolder {
   /// Philosophy / ethos definitions.
   static const philosophy = BundleFolder._('philosophy');
 
+  /// Agent definitions (4-axis bindings + runtime config).
+  static const agents = BundleFolder._('agents');
+
   /// All reserved folder names, in declaration order.
   static const values = <BundleFolder>[
     ui,
@@ -43,6 +46,7 @@ class BundleFolder {
     knowledge,
     profiles,
     philosophy,
+    agents,
   ];
 
   /// On-disk folder name (e.g. `'ui'`).

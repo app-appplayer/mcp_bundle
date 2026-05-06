@@ -4,6 +4,7 @@
 library;
 
 import '../io/bundle_resources.dart';
+import 'agent_section.dart';
 import 'asset.dart';
 import 'binding.dart';
 import 'fact_graph_schema.dart';
@@ -11,6 +12,7 @@ import 'flow_section.dart';
 import 'integrity.dart';
 import 'knowledge.dart';
 import 'manifest.dart';
+import 'philosophy_section.dart';
 import 'policy.dart';
 import 'profile_section.dart';
 import 'skill_section.dart';
@@ -52,6 +54,12 @@ class McpBundle {
   /// Profiles section with profile definitions.
   final ProfilesSection? profiles;
 
+  /// Philosophy section with guiding principles + examples.
+  final PhilosophySection? philosophy;
+
+  /// Agents section with agent definitions (4-axis bindings + runtime cfg).
+  final AgentsSection? agents;
+
   /// FactGraph schema definitions.
   final FactGraphSchema? factGraphSchema;
 
@@ -83,6 +91,8 @@ class McpBundle {
     this.tests,
     this.policies,
     this.profiles,
+    this.philosophy,
+    this.agents,
     this.factGraphSchema,
     this.compatibility,
     this.integrity,
@@ -124,6 +134,13 @@ class McpBundle {
       profiles: json['profiles'] != null
           ? ProfilesSection.fromJson(json['profiles'] as Map<String, dynamic>)
           : null,
+      philosophy: json['philosophy'] != null
+          ? PhilosophySection.fromJson(
+              json['philosophy'] as Map<String, dynamic>)
+          : null,
+      agents: json['agents'] != null
+          ? AgentsSection.fromJson(json['agents'] as Map<String, dynamic>)
+          : null,
       factGraphSchema: json['factGraphSchema'] != null
           ? FactGraphSchema.fromJson(json['factGraphSchema'] as Map<String, dynamic>)
           : null,
@@ -151,6 +168,8 @@ class McpBundle {
       if (tests != null) 'tests': tests!.toJson(),
       if (policies != null) 'policies': policies!.toJson(),
       if (profiles != null) 'profiles': profiles!.toJson(),
+      if (philosophy != null) 'philosophy': philosophy!.toJson(),
+      if (agents != null) 'agents': agents!.toJson(),
       if (factGraphSchema != null) 'factGraphSchema': factGraphSchema!.toJson(),
       if (compatibility != null) 'compatibility': compatibility!.toJson(),
       if (integrity != null) 'integrity': integrity!.toJson(),
@@ -171,6 +190,8 @@ class McpBundle {
     TestSection? tests,
     PolicySection? policies,
     ProfilesSection? profiles,
+    PhilosophySection? philosophy,
+    AgentsSection? agents,
     FactGraphSchema? factGraphSchema,
     CompatibilityConfig? compatibility,
     IntegrityConfig? integrity,
@@ -189,6 +210,8 @@ class McpBundle {
       tests: tests ?? this.tests,
       policies: policies ?? this.policies,
       profiles: profiles ?? this.profiles,
+      philosophy: philosophy ?? this.philosophy,
+      agents: agents ?? this.agents,
       factGraphSchema: factGraphSchema ?? this.factGraphSchema,
       compatibility: compatibility ?? this.compatibility,
       integrity: integrity ?? this.integrity,
@@ -208,6 +231,8 @@ class McpBundle {
       tests != null ||
       policies != null ||
       profiles != null ||
+      philosophy != null ||
+      agents != null ||
       factGraphSchema != null;
 
   /// Get all section names that are present.
@@ -222,6 +247,8 @@ class McpBundle {
     if (tests != null) sections.add('tests');
     if (policies != null) sections.add('policies');
     if (profiles != null) sections.add('profiles');
+    if (philosophy != null) sections.add('philosophy');
+    if (agents != null) sections.add('agents');
     if (factGraphSchema != null) sections.add('factGraphSchema');
     if (compatibility != null) sections.add('compatibility');
     if (integrity != null) sections.add('integrity');
@@ -283,4 +310,7 @@ class McpBundle {
   /// Philosophy / ethos definitions under `<bundle>/philosophy/`.
   BundleResources get philosophyResources =>
       resources(BundleFolder.philosophy);
+
+  /// Agent definitions under `<bundle>/agents/`.
+  BundleResources get agentResources => resources(BundleFolder.agents);
 }

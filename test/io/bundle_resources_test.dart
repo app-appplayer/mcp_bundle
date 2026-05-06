@@ -250,11 +250,19 @@ void main() {
       expect(generic, equals(typed));
     });
 
-    test('BundleFolder.values enumerates all six reserved folders', () {
-      expect(BundleFolder.values, hasLength(6));
+    test('BundleFolder.values enumerates all seven reserved folders', () {
+      expect(BundleFolder.values, hasLength(7));
       expect(
         BundleFolder.values.map((f) => f.name).toList(),
-        equals(['ui', 'assets', 'skills', 'knowledge', 'profiles', 'philosophy']),
+        equals([
+          'ui',
+          'assets',
+          'skills',
+          'knowledge',
+          'profiles',
+          'philosophy',
+          'agents',
+        ]),
       );
     });
   });

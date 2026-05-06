@@ -51,5 +51,60 @@ void main() {
       expect(rec.active, isTrue);
       expect(rec.payload['priority'], 'care');
     });
+
+    test('EthosRecord.toJson emits ISO-8601 createdAt + payload as-is', () {
+      final rec = EthosRecord(
+        id: 'e1',
+        name: 'Care',
+        version: '2.0',
+        payload: const {'priority': 'care', 'nested': {'k': 1}},
+        createdAt: DateTime.utc(2026, 5, 4, 12, 30, 45),
+        active: true,
+      );
+      final json = rec.toJson();
+      expect(json['id'], 'e1');
+      expect(json['name'], 'Care');
+      expect(json['version'], '2.0');
+      expect(json['active'], isTrue);
+      expect(json['createdAt'], '2026-05-04T12:30:45.000Z');
+      expect(json['payload'], rec.payload);
+    });
+
+    test('EthosRecord.fromJson round-trips through toJson', () {
+      final original = EthosRecord(
+        id: 'e1',
+        name: 'Care',
+        version: '2.0',
+        payload: const {'priority': 'care', 'rules': ['r1', 'r2']},
+        createdAt: DateTime.utc(2026, 5, 4, 12, 30, 45),
+        active: true,
+      );
+      final encoded = original.toJson();
+      final decoded = EthosRecord.fromJson(encoded);
+      expect(decoded.id, original.id);
+      expect(decoded.name, original.name);
+      expect(decoded.version, original.version);
+      expect(decoded.payload, original.payload);
+      expect(decoded.createdAt.toUtc(), original.createdAt.toUtc());
+      expect(decoded.active, original.active);
+    });
+
+    test('EthosRecord.fromJson tolerates missing optional fields', () {
+      final decoded = EthosRecord.fromJson(const {
+        'id': 'e1',
+        'name': 'Care',
+        'version': '1.0',
+        'payload': {},
+        // createdAt + active omitted
+      });
+      expect(decoded.id, 'e1');
+      expect(decoded.active, isFalse);
+      // createdAt falls back to DateTime.now() — assert it is recent rather
+      // than a fixed value.
+      expect(
+        DateTime.now().difference(decoded.createdAt).inSeconds < 5,
+        isTrue,
+      );
+    });
   });
 }

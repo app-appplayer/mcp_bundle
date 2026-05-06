@@ -1,3 +1,14 @@
+## [0.3.1] - 2026-05-04 - EthosRecord JSON round-trip + `agents` reserved folder
+
+### Added
+- `EthosRecord.fromJson` / `EthosRecord.toJson` — adapters that persist ethos records via `dart:convert` (KV stores, file-backed adapters, network bridges) can now serialize without ad-hoc per-host glue. `payload` is preserved as-is, `createdAt` round-trips through ISO-8601, `active` defaults to false when absent.
+- `BundleFolder.agents` — seventh reserved bundle folder for agent definitions (4-axis bindings + runtime config). Companion `Bundle.agentResources` getter exposes the same `BundleResources` surface as the other six folders. Hosts that bundle agents alongside ui / skills / knowledge / profiles / philosophy now have a canonical on-disk slot.
+- `AgentsSection` / `AgentDefinition` — typed model for agent definitions inside a bundle (the static description that a host runtime instantiates into a live agent: role, four-axis bindings — profiles / skills / facts / philosophies — and runtime config such as model / tools / behavior).
+- `PhilosophySection` — typed model for philosophy / ethos definitions (guiding principles paired with applied examples and counter-examples). Distinct from `PolicySection` — philosophy captures *why* and *what to learn from*, policy captures *what to enforce*.
+- `EthosStorePort` extensions — additional accessor methods so consumers (e.g. `mcp_knowledge.PhilosophyFacade.getEthosById`) can resolve ethos records by id without scanning, completing the symmetry with the other knowledge stores.
+
+---
+
 ## [0.3.0] - 2026-04-28 - Standard Port Catalog & Install Pipeline
 
 ### Added

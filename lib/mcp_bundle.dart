@@ -20,6 +20,8 @@ export 'src/models/knowledge.dart';
 export 'src/models/binding.dart';
 export 'src/models/test_section.dart';
 export 'src/models/profile_section.dart';
+export 'src/models/philosophy_section.dart';
+export 'src/models/agent_section.dart';
 export 'src/models/fact_graph_section.dart' hide ValidationRule;
 export 'src/models/fact_graph_schema.dart';
 export 'src/models/policy.dart';
