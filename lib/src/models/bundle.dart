@@ -8,6 +8,7 @@ import 'agent_section.dart';
 import 'asset.dart';
 import 'binding.dart';
 import 'fact_graph_schema.dart';
+import 'fact_graph_section.dart';
 import 'flow_section.dart';
 import 'integrity.dart';
 import 'knowledge.dart';
@@ -63,6 +64,10 @@ class McpBundle {
   /// FactGraph schema definitions.
   final FactGraphSchema? factGraphSchema;
 
+  /// FactGraph instance data (entities, facts, relations) — embedded
+  /// inline or referenced externally per [FactGraphSection.mode].
+  final FactGraphSection? factGraphSection;
+
   /// Compatibility configuration.
   final CompatibilityConfig? compatibility;
 
@@ -94,6 +99,7 @@ class McpBundle {
     this.philosophy,
     this.agents,
     this.factGraphSchema,
+    this.factGraphSection,
     this.compatibility,
     this.integrity,
     this.extensions = const {},
@@ -144,6 +150,9 @@ class McpBundle {
       factGraphSchema: json['factGraphSchema'] != null
           ? FactGraphSchema.fromJson(json['factGraphSchema'] as Map<String, dynamic>)
           : null,
+      factGraphSection: json['factGraphSection'] != null
+          ? FactGraphSection.fromJson(json['factGraphSection'] as Map<String, dynamic>)
+          : null,
       compatibility: json['compatibility'] != null
           ? CompatibilityConfig.fromJson(json['compatibility'] as Map<String, dynamic>)
           : null,
@@ -171,6 +180,7 @@ class McpBundle {
       if (philosophy != null) 'philosophy': philosophy!.toJson(),
       if (agents != null) 'agents': agents!.toJson(),
       if (factGraphSchema != null) 'factGraphSchema': factGraphSchema!.toJson(),
+      if (factGraphSection != null) 'factGraphSection': factGraphSection!.toJson(),
       if (compatibility != null) 'compatibility': compatibility!.toJson(),
       if (integrity != null) 'integrity': integrity!.toJson(),
       if (extensions.isNotEmpty) 'extensions': extensions,
@@ -193,6 +203,7 @@ class McpBundle {
     PhilosophySection? philosophy,
     AgentsSection? agents,
     FactGraphSchema? factGraphSchema,
+    FactGraphSection? factGraphSection,
     CompatibilityConfig? compatibility,
     IntegrityConfig? integrity,
     Map<String, dynamic>? extensions,
@@ -213,6 +224,7 @@ class McpBundle {
       philosophy: philosophy ?? this.philosophy,
       agents: agents ?? this.agents,
       factGraphSchema: factGraphSchema ?? this.factGraphSchema,
+      factGraphSection: factGraphSection ?? this.factGraphSection,
       compatibility: compatibility ?? this.compatibility,
       integrity: integrity ?? this.integrity,
       extensions: extensions ?? this.extensions,
@@ -233,7 +245,8 @@ class McpBundle {
       profiles != null ||
       philosophy != null ||
       agents != null ||
-      factGraphSchema != null;
+      factGraphSchema != null ||
+      factGraphSection != null;
 
   /// Get all section names that are present.
   List<String> get presentSections {
@@ -250,6 +263,7 @@ class McpBundle {
     if (philosophy != null) sections.add('philosophy');
     if (agents != null) sections.add('agents');
     if (factGraphSchema != null) sections.add('factGraphSchema');
+    if (factGraphSection != null) sections.add('factGraphSection');
     if (compatibility != null) sections.add('compatibility');
     if (integrity != null) sections.add('integrity');
     if (extensions.isNotEmpty) sections.add('extensions');

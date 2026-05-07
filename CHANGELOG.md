@@ -1,3 +1,10 @@
+## [0.3.2] - 2026-05-07 - `factGraphSection` wired into `McpBundle`
+
+### Added
+- `McpBundle.factGraphSection` — `FactGraphSection?` field exposing FactGraph instance data (entities / facts / relations / summaries / policies, embedded inline or referenced externally per `FactGraphSection.mode`). The `FactGraphSection` model existed since 0.3.0 but was not wired through `McpBundle`'s constructor / `fromJson` / `toJson` / `copyWith` / `hasContent` / `presentSections`, so adapters that wanted to round-trip fact instances inside a bundle had no canonical slot. This release adds the wire so consumers can persist fact instance data alongside the existing `factGraphSchema` (type definitions). Strictly additive — no existing field shape changed; bundles produced by 0.3.x clients continue to load unchanged.
+
+---
+
 ## [0.3.1] - 2026-05-04 - EthosRecord JSON round-trip + `agents` reserved folder
 
 ### Added
