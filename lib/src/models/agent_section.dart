@@ -10,16 +10,21 @@ library;
 
 /// A section containing agent definitions.
 class AgentsSection {
+  /// Schema version for this section. Default `'1.0.0'`.
+  final String schemaVersion;
+
   /// Agent definitions in this section.
   final List<AgentDefinition> agents;
 
   const AgentsSection({
+    this.schemaVersion = '1.0.0',
     this.agents = const [],
   });
 
   /// Create from JSON.
   factory AgentsSection.fromJson(Map<String, dynamic> json) {
     return AgentsSection(
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
       agents: (json['agents'] as List<dynamic>?)
               ?.map((e) => AgentDefinition.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -29,6 +34,7 @@ class AgentsSection {
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        'schemaVersion': schemaVersion,
         if (agents.isNotEmpty)
           'agents': agents.map((a) => a.toJson()).toList(),
       };
@@ -49,9 +55,11 @@ class AgentsSection {
 
   /// Create a copy with modifications.
   AgentsSection copyWith({
+    String? schemaVersion,
     List<AgentDefinition>? agents,
   }) {
     return AgentsSection(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       agents: agents ?? this.agents,
     );
   }

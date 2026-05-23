@@ -54,7 +54,7 @@ void main() {
       // ignore: deprecated_member_use
       expect(section.pages, hasLength(1));
       // ignore: deprecated_member_use
-      expect(section.pages.first.id, equals('home'));
+      expect(section.pages.values.first.id, equals('home'));
 
       final output = section.toJson();
       // Round-trip: input `screens` is preserved verbatim.

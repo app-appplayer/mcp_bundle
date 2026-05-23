@@ -22,6 +22,15 @@ export 'src/models/test_section.dart';
 export 'src/models/profile_section.dart';
 export 'src/models/philosophy_section.dart';
 export 'src/models/agent_section.dart';
+export 'src/models/chat_section.dart';
+export 'src/models/settings_section.dart';
+export 'src/models/wiring_section.dart';
+export 'src/models/facts_section.dart';
+export 'src/models/workflows_section.dart';
+export 'src/models/pipelines_section.dart';
+export 'src/models/runbooks_section.dart';
+export 'src/models/tools_section.dart';
+export 'src/models/requires_section.dart';
 export 'src/models/fact_graph_section.dart' hide ValidationRule;
 export 'src/models/fact_graph_schema.dart';
 export 'src/models/policy.dart';
@@ -65,6 +74,7 @@ export 'src/io/memory_storage_adapter.dart';
 export 'src/io/http_storage_adapter.dart';
 export 'src/io/bundle_repository.dart';
 export 'src/io/bundle_resources.dart';
+export 'src/io/bundle_mutator.dart';
 
 // Install Lifecycle
 export 'src/install/install_policy.dart';
@@ -79,6 +89,7 @@ export 'src/install/mcp_bundle_installer.dart';
 export 'src/validator/bundle_validator.dart';
 export 'src/validator/validation_result.dart';
 export 'src/validator/mcp_bundle_validator.dart';
+export 'src/validator/partial_validators.dart';
 
 // Utils
 export 'src/utils/canonicalization.dart';

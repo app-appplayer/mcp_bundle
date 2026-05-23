@@ -136,13 +136,13 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 
@@ -158,13 +158,13 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: '',
                 name: 'Home',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 
@@ -184,13 +184,13 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: '123invalid',
                 name: 'Home',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 
@@ -207,18 +207,22 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              // Map keys differ from `value.id` so we can still exercise
+              // duplicate id detection — it runs against `page.id`, not
+              // the map key, so collisions can be tested without the
+              // map collapsing entries.
+              'home_a': PageDefinition(
                 id: 'home',
                 name: 'Home 1',
                 root: WidgetNode(type: 'container'),
               ),
-              PageDefinition(
+              'home_b': PageDefinition(
                 id: 'home',
                 name: 'Home 2',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 
@@ -235,13 +239,13 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(type: ''),
               ),
-            ],
+            },
           ),
         );
 
@@ -258,8 +262,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -269,7 +273,7 @@ void main() {
                   ],
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -285,8 +289,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -296,7 +300,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -313,8 +317,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -324,7 +328,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -567,8 +571,8 @@ void main() {
             ],
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -581,7 +585,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -602,8 +606,8 @@ void main() {
             ],
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -616,7 +620,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -633,8 +637,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -647,12 +651,12 @@ void main() {
                   },
                 ),
               ),
-              PageDefinition(
+              'settings': PageDefinition(
                 id: 'settings',
                 name: 'Settings',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 
@@ -668,8 +672,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -682,7 +686,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -698,8 +702,8 @@ void main() {
             version: '1.0.0',
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -712,7 +716,7 @@ void main() {
                   },
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -733,8 +737,8 @@ void main() {
             ],
           ),
           ui: UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'home': PageDefinition(
                 id: 'home',
                 name: 'Home',
                 root: WidgetNode(
@@ -752,7 +756,7 @@ void main() {
                   ],
                 ),
               ),
-            ],
+            },
           ),
         );
 
@@ -774,18 +778,18 @@ void main() {
             ],
           ),
           ui: const UiSection(
-            pages: [
-              PageDefinition(
+            pages: {
+              'screen1': PageDefinition(
                 id: 'screen1',
                 name: 'Screen 1',
                 root: WidgetNode(type: 'container'),
               ),
-              PageDefinition(
+              'screen2': PageDefinition(
                 id: 'screen2',
                 name: 'Screen 2',
                 root: WidgetNode(type: 'container'),
               ),
-            ],
+            },
           ),
         );
 

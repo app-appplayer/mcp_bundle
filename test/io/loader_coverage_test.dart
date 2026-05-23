@@ -892,7 +892,7 @@ void main() {
 
       // No exception since skill-1 exists
       final bundle = McpBundleLoader.fromJson(json);
-      expect(bundle.ui!.pages.first.root.children, hasLength(1));
+      expect(bundle.ui!.pages.values.first.root.children, hasLength(1));
     });
 
     test('validates multiple levels of nesting with actions', () {

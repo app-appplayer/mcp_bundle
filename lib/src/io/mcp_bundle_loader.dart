@@ -11,11 +11,31 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import '../models/bundle.dart';
-import '../models/manifest.dart';
-import '../models/ui_section.dart';
-import '../models/skill_section.dart';
+import '../models/agent_section.dart';
 import '../models/asset.dart';
+import '../models/binding.dart';
+import '../models/bundle.dart';
+import '../models/chat_section.dart';
+import '../models/fact_graph_schema.dart';
+import '../models/fact_graph_section.dart';
+import '../models/facts_section.dart';
+import '../models/flow_section.dart';
+import '../models/integrity.dart';
+import '../models/knowledge.dart';
+import '../models/manifest.dart';
+import '../models/philosophy_section.dart';
+import '../models/pipelines_section.dart';
+import '../models/policy.dart';
+import '../models/profile_section.dart';
+import '../models/requires_section.dart';
+import '../models/runbooks_section.dart';
+import '../models/settings_section.dart';
+import '../models/skill_section.dart';
+import '../models/test_section.dart';
+import '../models/tools_section.dart';
+import '../models/ui_section.dart';
+import '../models/wiring_section.dart';
+import '../models/workflows_section.dart';
 import 'exceptions.dart';
 import 'type_coercion.dart';
 
@@ -93,12 +113,62 @@ class _ReferenceRegistry {
 }
 
 /// Parsed sections container.
+///
+/// Holds every typed top-level section that `McpBundle` carries. Loader
+/// `fromJson` forwards each present section into the assembled bundle so
+/// callers see the same surface as `McpBundle.fromJson`.
 class _ParsedSections {
   final UiSection? ui;
+  final FlowSection? flow;
   final SkillSection? skills;
   final AssetSection? assets;
+  final KnowledgeSection? knowledge;
+  final BindingSection? bindings;
+  final TestSection? tests;
+  final PolicySection? policies;
+  final ProfilesSection? profiles;
+  final PhilosophySection? philosophy;
+  final AgentsSection? agents;
+  final FactsSection? facts;
+  final WorkflowsSection? workflows;
+  final PipelinesSection? pipelines;
+  final RunbooksSection? runbooks;
+  final ToolsSection? tools;
+  final RequiresSection? requires;
+  final FactGraphSchema? factGraphSchema;
+  final FactGraphSection? factGraphSection;
+  final CompatibilityConfig? compatibility;
+  final IntegrityConfig? integrity;
+  final ChatSection? chat;
+  final WiringSection? wiring;
+  final SettingsSection? settingsSection;
 
-  _ParsedSections({this.ui, this.skills, this.assets});
+  _ParsedSections({
+    this.ui,
+    this.flow,
+    this.skills,
+    this.assets,
+    this.knowledge,
+    this.bindings,
+    this.tests,
+    this.policies,
+    this.profiles,
+    this.philosophy,
+    this.agents,
+    this.facts,
+    this.workflows,
+    this.pipelines,
+    this.runbooks,
+    this.tools,
+    this.requires,
+    this.factGraphSchema,
+    this.factGraphSection,
+    this.compatibility,
+    this.integrity,
+    this.chat,
+    this.wiring,
+    this.settingsSection,
+  });
 }
 
 /// Main entry point for loading MCP bundles.
@@ -144,8 +214,29 @@ class McpBundleLoader {
     // merged under reserved underscore-prefixed keys so they never
     // collide with author-supplied entries.
     final rawExtensions = json['extensions'];
+    // Capture any top-level key the model does not yet recognise into
+    // a reserved `_unmodeledTopLevel` sub-map on extensions. Forward
+    // compatibility — bundles authored against a future spec extension
+    // round-trip through an older loader without silent loss. The
+    // emitter (`McpBundle.toJson`) re-spreads these keys back to the
+    // top level on write. Keep this set in sync with the typed slots
+    // McpBundle exposes (plus the reserved `extensions` channel).
+    const knownTopLevel = <String>{
+      'schemaVersion', 'manifest', 'ui', 'flow', 'skills', 'assets',
+      'knowledge', 'bindings', 'tests', 'policies', 'profiles',
+      'philosophy', 'agents', 'facts', 'workflows', 'pipelines',
+      'runbooks', 'tools', 'requires', 'factGraphSchema',
+      'factGraphSection', 'compatibility', 'integrity', 'chat',
+      'wiring', 'settings', 'extensions',
+    };
+    final unmodeled = <String, dynamic>{
+      for (final e in json.entries)
+        if (!knownTopLevel.contains(e.key) && !e.key.startsWith('_'))
+          e.key: e.value,
+    };
     final extensions = <String, dynamic>{
       if (rawExtensions is Map<String, dynamic>) ...rawExtensions,
+      if (unmodeled.isNotEmpty) '_unmodeledTopLevel': unmodeled,
       if (warnings.isNotEmpty) '_loadWarnings': warnings,
       if (errors.isNotEmpty)
         '_loadErrors': errors.map((e) => e.toString()).toList(),
@@ -156,8 +247,29 @@ class McpBundleLoader {
         schemaVersion: schemaVersion ?? defaultSchemaVersion,
       ),
       ui: sections.ui,
+      flow: sections.flow,
       skills: sections.skills,
       assets: sections.assets,
+      knowledge: sections.knowledge,
+      bindings: sections.bindings,
+      tests: sections.tests,
+      policies: sections.policies,
+      profiles: sections.profiles,
+      philosophy: sections.philosophy,
+      agents: sections.agents,
+      facts: sections.facts,
+      workflows: sections.workflows,
+      pipelines: sections.pipelines,
+      runbooks: sections.runbooks,
+      tools: sections.tools,
+      requires: sections.requires,
+      factGraphSchema: sections.factGraphSchema,
+      factGraphSection: sections.factGraphSection,
+      compatibility: sections.compatibility,
+      integrity: sections.integrity,
+      chat: sections.chat,
+      wiring: sections.wiring,
+      settingsSection: sections.settingsSection,
       extensions: extensions,
     );
   }
@@ -385,7 +497,7 @@ class McpBundleLoader {
     if (json.containsKey('ui')) {
       try {
         ui = UiSection.fromJson(json['ui'] as Map<String, dynamic>);
-        for (final page in ui.pages) {
+        for (final page in ui.pages.values) {
           registry.registerPage(page.id);
         }
       } catch (e) {
@@ -394,11 +506,232 @@ class McpBundleLoader {
       }
     }
 
+    // 3d. Parse the remaining typed top-level sections. Each follows the
+    // same lenient pattern: presence check → fromJson → on failure record
+    // an error + warning, leave the field null. Mirrors the canonical
+    // shape in `models/bundle.dart` `McpBundle.fromJson`.
+    final flow = _parseSection<FlowSection>(
+      json,
+      'flow',
+      FlowSection.fromJson,
+      errors,
+      warnings,
+    );
+    final knowledge = _parseSection<KnowledgeSection>(
+      json,
+      'knowledge',
+      KnowledgeSection.fromJson,
+      errors,
+      warnings,
+    );
+    final bindings = _parseSection<BindingSection>(
+      json,
+      'bindings',
+      BindingSection.fromJson,
+      errors,
+      warnings,
+    );
+    final tests = _parseSection<TestSection>(
+      json,
+      'tests',
+      TestSection.fromJson,
+      errors,
+      warnings,
+    );
+    final policies = _parseSection<PolicySection>(
+      json,
+      'policies',
+      PolicySection.fromJson,
+      errors,
+      warnings,
+    );
+    final profiles = _parseSection<ProfilesSection>(
+      json,
+      'profiles',
+      ProfilesSection.fromJson,
+      errors,
+      warnings,
+    );
+    final philosophy = _parseSection<PhilosophySection>(
+      json,
+      'philosophy',
+      PhilosophySection.fromJson,
+      errors,
+      warnings,
+    );
+    final agents = _parseSection<AgentsSection>(
+      json,
+      'agents',
+      AgentsSection.fromJson,
+      errors,
+      warnings,
+    );
+    final facts = _parseSection<FactsSection>(
+      json,
+      'facts',
+      FactsSection.fromJson,
+      errors,
+      warnings,
+    );
+    final workflows = _parseSection<WorkflowsSection>(
+      json,
+      'workflows',
+      WorkflowsSection.fromJson,
+      errors,
+      warnings,
+    );
+    final pipelines = _parseSection<PipelinesSection>(
+      json,
+      'pipelines',
+      PipelinesSection.fromJson,
+      errors,
+      warnings,
+    );
+    final runbooks = _parseSection<RunbooksSection>(
+      json,
+      'runbooks',
+      RunbooksSection.fromJson,
+      errors,
+      warnings,
+    );
+    final tools = _parseSection<ToolsSection>(
+      json,
+      'tools',
+      ToolsSection.fromJson,
+      errors,
+      warnings,
+    );
+    final requires = _parseSection<RequiresSection>(
+      json,
+      'requires',
+      RequiresSection.fromJson,
+      errors,
+      warnings,
+    );
+    final factGraphSchema = _parseSection<FactGraphSchema>(
+      json,
+      'factGraphSchema',
+      FactGraphSchema.fromJson,
+      errors,
+      warnings,
+    );
+    final factGraphSection = _parseSection<FactGraphSection>(
+      json,
+      'factGraphSection',
+      FactGraphSection.fromJson,
+      errors,
+      warnings,
+    );
+    final compatibility = _parseSection<CompatibilityConfig>(
+      json,
+      'compatibility',
+      CompatibilityConfig.fromJson,
+      errors,
+      warnings,
+    );
+    final integrity = _parseSection<IntegrityConfig>(
+      json,
+      'integrity',
+      IntegrityConfig.fromJson,
+      errors,
+      warnings,
+    );
+    // Spec §06 dual location — top-level wins, `manifest.<key>`
+    // accepted as legacy alias.
+    final chat = _parseDualLocationSection<ChatSection>(
+      json,
+      'chat',
+      ChatSection.fromJson,
+      errors,
+      warnings,
+    );
+    final wiring = _parseDualLocationSection<WiringSection>(
+      json,
+      'wiring',
+      WiringSection.fromJson,
+      errors,
+      warnings,
+    );
+    final settingsSection = _parseDualLocationSection<SettingsSection>(
+      json,
+      'settings',
+      SettingsSection.fromJson,
+      errors,
+      warnings,
+    );
+
     return _ParsedSections(
       ui: ui,
+      flow: flow,
       skills: skills,
       assets: assets,
+      knowledge: knowledge,
+      bindings: bindings,
+      tests: tests,
+      policies: policies,
+      profiles: profiles,
+      philosophy: philosophy,
+      agents: agents,
+      facts: facts,
+      workflows: workflows,
+      pipelines: pipelines,
+      runbooks: runbooks,
+      tools: tools,
+      requires: requires,
+      factGraphSchema: factGraphSchema,
+      factGraphSection: factGraphSection,
+      compatibility: compatibility,
+      integrity: integrity,
+      chat: chat,
+      wiring: wiring,
+      settingsSection: settingsSection,
     );
+  }
+
+  /// Like [_parseSection] but resolves spec §06's dual location —
+  /// top-level wins, `manifest.<key>` accepted as legacy alias for
+  /// bundles authored before the canonical position was finalised.
+  static T? _parseDualLocationSection<T>(
+    Map<String, dynamic> json,
+    String key,
+    T Function(Map<String, dynamic>) fromJson,
+    List<BundleLoadException> errors,
+    List<String> warnings,
+  ) {
+    final top = _parseSection<T>(json, key, fromJson, errors, warnings);
+    if (top != null) return top;
+    final manifest = json['manifest'];
+    if (manifest is Map<String, dynamic>) {
+      return _parseSection<T>(manifest, key, fromJson, errors, warnings);
+    }
+    return null;
+  }
+
+  /// Generic Section parser. Returns null if [key] absent. On `fromJson`
+  /// failure records an error + skip warning and returns null so the
+  /// load continues — same recovery posture as the assets / skills / ui
+  /// arms above.
+  static T? _parseSection<T>(
+    Map<String, dynamic> json,
+    String key,
+    T Function(Map<String, dynamic>) fromJson,
+    List<BundleLoadException> errors,
+    List<String> warnings,
+  ) {
+    if (!json.containsKey(key)) return null;
+    final raw = json[key];
+    if (raw is! Map<String, dynamic>) {
+      errors.add(BundleInvalidValueException(key, raw, 'object'));
+      warnings.add('$key section skipped — expected object');
+      return null;
+    }
+    try {
+      return fromJson(raw);
+    } catch (e) {
+      errors.add(BundleLoadException('Failed to parse $key section: $e'));
+      warnings.add('$key section skipped due to parsing error');
+      return null;
+    }
   }
 
   // ==================== Phase 4: Reference Validation ====================
@@ -412,7 +745,7 @@ class McpBundleLoader {
     if (sections.ui != null && sections.skills != null) {
       final skillIds = sections.skills!.modules.map((m) => m.id).toSet();
 
-      for (final page in sections.ui!.pages) {
+      for (final page in sections.ui!.pages.values) {
         // Check action references in root widget
         _validateWidgetActions(page.root, skillIds, errors);
       }
@@ -505,21 +838,17 @@ class McpBundleLoader {
       return asset;
     }).toList();
 
-    return McpBundle(
-      manifest: bundle.manifest,
-      ui: bundle.ui,
-      flow: bundle.flow,
-      skills: bundle.skills,
+    // Use copyWith so every other Section the loader assembled survives
+    // path-resolution. Manual constructor list-out drops anything the
+    // caller forgets to enumerate (the historical loader bug — see
+    // CHANGELOG 0.3.3 Fixed).
+    return bundle.copyWith(
       assets: AssetSection(
         schemaVersion: bundle.assets!.schemaVersion,
         assets: resolvedAssets,
         directories: bundle.assets!.directories,
         bundles: bundle.assets!.bundles,
       ),
-      knowledge: bundle.knowledge,
-      bindings: bundle.bindings,
-      tests: bundle.tests,
-      extensions: bundle.extensions,
     );
   }
 }

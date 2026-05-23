@@ -6,16 +6,21 @@ library;
 
 /// Policy section containing bundle policies.
 class PolicySection {
+  /// Schema version for this section. Default `'1.0.0'`.
+  final String schemaVersion;
+
   /// Policies defined in bundle.
   final List<Policy> policies;
 
   const PolicySection({
+    this.schemaVersion = '1.0.0',
     this.policies = const [],
   });
 
   /// Create from JSON.
   factory PolicySection.fromJson(Map<String, dynamic> json) {
     return PolicySection(
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
       policies: (json['policies'] as List<dynamic>?)
               ?.map((e) => Policy.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -26,6 +31,7 @@ class PolicySection {
   /// Convert to JSON.
   Map<String, dynamic> toJson() {
     return {
+      'schemaVersion': schemaVersion,
       if (policies.isNotEmpty)
         'policies': policies.map((p) => p.toJson()).toList(),
     };
@@ -33,9 +39,11 @@ class PolicySection {
 
   /// Create a copy with modifications.
   PolicySection copyWith({
+    String? schemaVersion,
     List<Policy>? policies,
   }) {
     return PolicySection(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       policies: policies ?? this.policies,
     );
   }

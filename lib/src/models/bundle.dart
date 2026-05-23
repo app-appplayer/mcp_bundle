@@ -7,18 +7,27 @@ import '../io/bundle_resources.dart';
 import 'agent_section.dart';
 import 'asset.dart';
 import 'binding.dart';
+import 'chat_section.dart';
 import 'fact_graph_schema.dart';
 import 'fact_graph_section.dart';
+import 'facts_section.dart';
 import 'flow_section.dart';
 import 'integrity.dart';
 import 'knowledge.dart';
 import 'manifest.dart';
 import 'philosophy_section.dart';
+import 'pipelines_section.dart';
 import 'policy.dart';
 import 'profile_section.dart';
+import 'requires_section.dart';
+import 'runbooks_section.dart';
+import 'settings_section.dart';
 import 'skill_section.dart';
 import 'test_section.dart';
+import 'tools_section.dart';
 import 'ui_section.dart';
+import 'wiring_section.dart';
+import 'workflows_section.dart';
 
 /// A complete MCP Bundle containing all packaged resources.
 class McpBundle {
@@ -61,6 +70,36 @@ class McpBundle {
   /// Agents section with agent definitions (4-axis bindings + runtime cfg).
   final AgentsSection? agents;
 
+  /// Facts section — atomic subject-predicate-object triples carried
+  /// inline in `manifest.json` under the `facts` key.
+  final FactsSection? facts;
+
+  /// Workflows section — ordered step sequences carried inline in
+  /// `manifest.json` under the `workflows` key.
+  final WorkflowsSection? workflows;
+
+  /// Pipelines section — ordered stage sequences carried inline in
+  /// `manifest.json` under the `pipelines` key.
+  final PipelinesSection? pipelines;
+
+  /// Runbooks section — ordered procedure sequences carried inline in
+  /// `manifest.json` under the `runbooks` key.
+  final RunbooksSection? runbooks;
+
+  /// Tools section — host-callable tool entries (host builtin / MCP /
+  /// cloud / bundled JS) carried inline in `manifest.json` under the
+  /// `tools` key. Studio · AppPlayer read this to discover what tools a
+  /// bundle exposes and how to dispatch them.
+  final ToolsSection? tools;
+
+  /// Portability contract — declares which host capabilities the
+  /// bundle needs (atom categories + specific host-tool names).
+  /// Carried inline in `manifest.json` under the `requires` key. Both
+  /// Studio and AppPlayer enforce this gate at activation: bundles
+  /// requiring atoms / tools the host doesn't advertise are refused.
+  /// `null` = no declared requirements (fully portable).
+  final RequiresSection? requires;
+
   /// FactGraph schema definitions.
   final FactGraphSchema? factGraphSchema;
 
@@ -73,6 +112,22 @@ class McpBundle {
 
   /// Integrity configuration.
   final IntegrityConfig? integrity;
+
+  /// Chat-UI binding surface — slash commands + default agent
+  /// (spec §06.5). Top-level per the wiring spec; loaders accept
+  /// legacy `manifest.chat` as alias.
+  final ChatSection? chat;
+
+  /// Chrome wiring surface — domainActions / lifecycle / settings
+  /// (spec §06.2 – §06.4). Top-level per the wiring spec; loaders
+  /// accept legacy `manifest.wiring` as alias.
+  final WiringSection? wiring;
+
+  /// User settings form schema — sections × fields. Distinct from
+  /// `WiringSection.settings[]` which carries trigger actions.
+  /// Top-level per the wiring spec; loaders accept legacy
+  /// `manifest.settings` as alias.
+  final SettingsSection? settingsSection;
 
   /// Extensions for custom data.
   final Map<String, dynamic> extensions;
@@ -98,10 +153,19 @@ class McpBundle {
     this.profiles,
     this.philosophy,
     this.agents,
+    this.facts,
+    this.workflows,
+    this.pipelines,
+    this.runbooks,
+    this.tools,
+    this.requires,
     this.factGraphSchema,
     this.factGraphSection,
     this.compatibility,
     this.integrity,
+    this.chat,
+    this.wiring,
+    this.settingsSection,
     this.extensions = const {},
     this.directory,
   });
@@ -147,6 +211,24 @@ class McpBundle {
       agents: json['agents'] != null
           ? AgentsSection.fromJson(json['agents'] as Map<String, dynamic>)
           : null,
+      facts: json['facts'] != null
+          ? FactsSection.fromJson(json['facts'] as Map<String, dynamic>)
+          : null,
+      workflows: json['workflows'] != null
+          ? WorkflowsSection.fromJson(json['workflows'] as Map<String, dynamic>)
+          : null,
+      pipelines: json['pipelines'] != null
+          ? PipelinesSection.fromJson(json['pipelines'] as Map<String, dynamic>)
+          : null,
+      runbooks: json['runbooks'] != null
+          ? RunbooksSection.fromJson(json['runbooks'] as Map<String, dynamic>)
+          : null,
+      tools: json['tools'] != null
+          ? ToolsSection.fromJson(json['tools'] as Map<String, dynamic>)
+          : null,
+      requires: json['requires'] != null
+          ? RequiresSection.fromJson(json['requires'] as Map<String, dynamic>)
+          : null,
       factGraphSchema: json['factGraphSchema'] != null
           ? FactGraphSchema.fromJson(json['factGraphSchema'] as Map<String, dynamic>)
           : null,
@@ -159,8 +241,68 @@ class McpBundle {
       integrity: json['integrity'] != null
           ? IntegrityConfig.fromJson(json['integrity'] as Map<String, dynamic>)
           : null,
-      extensions: json['extensions'] as Map<String, dynamic>? ?? {},
+      chat: _resolveSection(
+        json,
+        key: 'chat',
+        fromJson: ChatSection.fromJson,
+      ),
+      wiring: _resolveSection(
+        json,
+        key: 'wiring',
+        fromJson: WiringSection.fromJson,
+      ),
+      settingsSection: _resolveSection(
+        json,
+        key: 'settings',
+        fromJson: SettingsSection.fromJson,
+      ),
+      extensions: _absorbExtensions(json),
     );
+  }
+
+  /// Merge author-declared `extensions` with any top-level key the
+  /// model does not yet recognise (forward-compat — bundles
+  /// authored against a future spec extension round-trip through
+  /// today's loader without silent loss). The captured unknowns
+  /// land under reserved `_unmodeledTopLevel` and are re-spread
+  /// back to the top level by [toJson].
+  static Map<String, dynamic> _absorbExtensions(Map<String, dynamic> json) {
+    const knownTopLevel = <String>{
+      'schemaVersion', 'manifest', 'ui', 'flow', 'skills', 'assets',
+      'knowledge', 'bindings', 'tests', 'policies', 'profiles',
+      'philosophy', 'agents', 'facts', 'workflows', 'pipelines',
+      'runbooks', 'tools', 'requires', 'factGraphSchema',
+      'factGraphSection', 'compatibility', 'integrity', 'chat',
+      'wiring', 'settings', 'extensions',
+    };
+    final unmodeled = <String, dynamic>{
+      for (final e in json.entries)
+        if (!knownTopLevel.contains(e.key) && !e.key.startsWith('_'))
+          e.key: e.value,
+    };
+    final raw = json['extensions'];
+    return <String, dynamic>{
+      if (raw is Map<String, dynamic>) ...raw,
+      if (unmodeled.isNotEmpty) '_unmodeledTopLevel': unmodeled,
+    };
+  }
+
+  /// Spec §06 location resolution: top-level wins; manifest-nested
+  /// (legacy `manifest.<key>`) accepted as fallback so older bundles
+  /// that embedded chat / wiring / settings inline keep loading.
+  static T? _resolveSection<T>(
+    Map<String, dynamic> json, {
+    required String key,
+    required T Function(Map<String, dynamic>) fromJson,
+  }) {
+    final top = json[key];
+    if (top is Map<String, dynamic>) return fromJson(top);
+    final manifest = json['manifest'];
+    if (manifest is Map<String, dynamic>) {
+      final nested = manifest[key];
+      if (nested is Map<String, dynamic>) return fromJson(nested);
+    }
+    return null;
   }
 
   /// Convert to JSON.
@@ -179,11 +321,39 @@ class McpBundle {
       if (profiles != null) 'profiles': profiles!.toJson(),
       if (philosophy != null) 'philosophy': philosophy!.toJson(),
       if (agents != null) 'agents': agents!.toJson(),
+      if (facts != null) 'facts': facts!.toJson(),
+      if (workflows != null) 'workflows': workflows!.toJson(),
+      if (pipelines != null) 'pipelines': pipelines!.toJson(),
+      if (runbooks != null) 'runbooks': runbooks!.toJson(),
+      if (tools != null) 'tools': tools!.toJson(),
+      if (requires != null) 'requires': requires!.toJson(),
       if (factGraphSchema != null) 'factGraphSchema': factGraphSchema!.toJson(),
       if (factGraphSection != null) 'factGraphSection': factGraphSection!.toJson(),
       if (compatibility != null) 'compatibility': compatibility!.toJson(),
       if (integrity != null) 'integrity': integrity!.toJson(),
-      if (extensions.isNotEmpty) 'extensions': extensions,
+      if (chat != null) 'chat': chat!.toJson(),
+      if (wiring != null) 'wiring': wiring!.toJson(),
+      if (settingsSection != null) 'settings': settingsSection!.toJson(),
+      // Forward-compat: re-spread any keys the loader captured into
+      // `extensions._unmodeledTopLevel` back at the top level so
+      // round-trip through an older loader does not erase keys an
+      // newer spec extension may have introduced.
+      ..._spreadUnmodeled(),
+      if (_extensionsWithoutReserved().isNotEmpty)
+        'extensions': _extensionsWithoutReserved(),
+    };
+  }
+
+  Map<String, dynamic> _spreadUnmodeled() {
+    final um = extensions['_unmodeledTopLevel'];
+    if (um is Map<String, dynamic>) return um;
+    return const {};
+  }
+
+  Map<String, dynamic> _extensionsWithoutReserved() {
+    return <String, dynamic>{
+      for (final e in extensions.entries)
+        if (e.key != '_unmodeledTopLevel') e.key: e.value,
     };
   }
 
@@ -202,10 +372,19 @@ class McpBundle {
     ProfilesSection? profiles,
     PhilosophySection? philosophy,
     AgentsSection? agents,
+    FactsSection? facts,
+    WorkflowsSection? workflows,
+    PipelinesSection? pipelines,
+    RunbooksSection? runbooks,
+    ToolsSection? tools,
+    RequiresSection? requires,
     FactGraphSchema? factGraphSchema,
     FactGraphSection? factGraphSection,
     CompatibilityConfig? compatibility,
     IntegrityConfig? integrity,
+    ChatSection? chat,
+    WiringSection? wiring,
+    SettingsSection? settingsSection,
     Map<String, dynamic>? extensions,
     String? directory,
   }) {
@@ -223,10 +402,19 @@ class McpBundle {
       profiles: profiles ?? this.profiles,
       philosophy: philosophy ?? this.philosophy,
       agents: agents ?? this.agents,
+      facts: facts ?? this.facts,
+      workflows: workflows ?? this.workflows,
+      pipelines: pipelines ?? this.pipelines,
+      runbooks: runbooks ?? this.runbooks,
+      tools: tools ?? this.tools,
+      requires: requires ?? this.requires,
       factGraphSchema: factGraphSchema ?? this.factGraphSchema,
       factGraphSection: factGraphSection ?? this.factGraphSection,
       compatibility: compatibility ?? this.compatibility,
       integrity: integrity ?? this.integrity,
+      chat: chat ?? this.chat,
+      wiring: wiring ?? this.wiring,
+      settingsSection: settingsSection ?? this.settingsSection,
       extensions: extensions ?? this.extensions,
       directory: directory ?? this.directory,
     );
@@ -245,8 +433,17 @@ class McpBundle {
       profiles != null ||
       philosophy != null ||
       agents != null ||
+      facts != null ||
+      workflows != null ||
+      pipelines != null ||
+      runbooks != null ||
+      tools != null ||
+      requires != null ||
       factGraphSchema != null ||
-      factGraphSection != null;
+      factGraphSection != null ||
+      chat != null ||
+      wiring != null ||
+      settingsSection != null;
 
   /// Get all section names that are present.
   List<String> get presentSections {
@@ -262,6 +459,12 @@ class McpBundle {
     if (profiles != null) sections.add('profiles');
     if (philosophy != null) sections.add('philosophy');
     if (agents != null) sections.add('agents');
+    if (facts != null) sections.add('facts');
+    if (workflows != null) sections.add('workflows');
+    if (pipelines != null) sections.add('pipelines');
+    if (runbooks != null) sections.add('runbooks');
+    if (tools != null) sections.add('tools');
+    if (requires != null) sections.add('requires');
     if (factGraphSchema != null) sections.add('factGraphSchema');
     if (factGraphSection != null) sections.add('factGraphSection');
     if (compatibility != null) sections.add('compatibility');
@@ -317,6 +520,29 @@ class McpBundle {
 
   /// Knowledge sources / retriever configs under `<bundle>/knowledge/`.
   BundleResources get knowledgeResources => resources(BundleFolder.knowledge);
+
+  /// Atomic subject-predicate-object fact records under `<bundle>/facts/`.
+  /// Companion to the inline `manifest.facts[]` carry.
+  BundleResources get factsResources => resources(BundleFolder.facts);
+
+  /// Workflow definitions (ordered step sequences) under
+  /// `<bundle>/workflows/`. Companion to the inline `manifest.workflows[]`
+  /// carry.
+  BundleResources get workflowsResources => resources(BundleFolder.workflows);
+
+  /// Pipeline definitions (ordered stage sequences) under
+  /// `<bundle>/pipelines/`. Companion to the inline `manifest.pipelines[]`
+  /// carry.
+  BundleResources get pipelinesResources => resources(BundleFolder.pipelines);
+
+  /// Runbook definitions (ordered procedure sequences) under
+  /// `<bundle>/runbooks/`. Companion to the inline `manifest.runbooks[]`
+  /// carry.
+  BundleResources get runbooksResources => resources(BundleFolder.runbooks);
+
+  /// Tool definitions (host-callable tool entries) under
+  /// `<bundle>/tools/`. Companion to the inline `manifest.tools[]` carry.
+  BundleResources get toolsResources => resources(BundleFolder.tools);
 
   /// Profile definitions under `<bundle>/profiles/`.
   BundleResources get profileResources => resources(BundleFolder.profiles);

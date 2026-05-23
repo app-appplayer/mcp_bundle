@@ -26,7 +26,7 @@ void main() {
           name: 'Full Bundle',
           version: '2.0.0',
         ),
-        ui: const UiSection(pages: []),
+        ui: const UiSection(pages: <String, PageDefinition>{}),
         flow: const FlowSection(flows: []),
       );
 
@@ -401,6 +401,203 @@ void main() {
         manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
       );
       expect(bundle.schemaVersion, '1.0.0');
+    });
+  });
+
+  group('McpBundle 0.3.3 extension sections', () {
+    test('round-trip with all 5 new sections (facts/workflows/pipelines/runbooks/tools)', () {
+      const original = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        facts: FactsSection(
+          facts: [
+            Fact(
+              id: 'f1',
+              subject: 'mcp_bundle',
+              predicate: 'has-version',
+              object: '0.3.3',
+              confidence: 0.95,
+              source: 'manifest',
+            ),
+          ],
+        ),
+        workflows: WorkflowsSection(
+          workflows: [
+            WorkflowEntry(
+              id: 'wf1',
+              name: 'Deploy',
+              steps: [
+                {'id': 's1', 'action': 'build'},
+              ],
+            ),
+          ],
+        ),
+        pipelines: PipelinesSection(
+          pipelines: [
+            PipelineEntry(
+              id: 'pl1',
+              name: 'ETL',
+              stages: [
+                {'id': 'extract'},
+              ],
+            ),
+          ],
+        ),
+        runbooks: RunbooksSection(
+          runbooks: [
+            RunbookEntry(
+              id: 'rb1',
+              name: 'Recover',
+              procedure: [
+                {'id': 'check'},
+              ],
+            ),
+          ],
+        ),
+        tools: ToolsSection(
+          tools: [
+            ToolEntry(
+              id: 't1',
+              name: 'studio.run',
+              kind: ToolKind.host,
+            ),
+            ToolEntry(
+              name: 'remote.search',
+              kind: ToolKind.mcp,
+              target: {
+                'transport': 'http',
+                'url': 'https://example.com/mcp',
+              },
+            ),
+          ],
+        ),
+      );
+
+      final json = original.toJson();
+      expect(json.containsKey('facts'), isTrue);
+      expect(json.containsKey('workflows'), isTrue);
+      expect(json.containsKey('pipelines'), isTrue);
+      expect(json.containsKey('runbooks'), isTrue);
+      expect(json.containsKey('tools'), isTrue);
+
+      final round = McpBundle.fromJson(json);
+      expect(round.facts, isNotNull);
+      expect(round.facts!.facts.first.id, 'f1');
+      expect(round.facts!.facts.first.confidence, 0.95);
+      expect(round.workflows, isNotNull);
+      expect(round.workflows!.workflows.first.id, 'wf1');
+      expect(round.pipelines, isNotNull);
+      expect(round.pipelines!.pipelines.first.stages.first['id'], 'extract');
+      expect(round.runbooks, isNotNull);
+      expect(round.runbooks!.runbooks.first.procedure.first['id'], 'check');
+      expect(round.tools, isNotNull);
+      expect(round.tools!.tools, hasLength(2));
+      expect(round.tools!.findByName('studio.run')!.kind, ToolKind.host);
+      expect(round.tools!.findByName('remote.search')!.kind, ToolKind.mcp);
+      expect(
+        round.tools!.findByName('remote.search')!.target['transport'],
+        'http',
+      );
+    });
+
+    test('hasContent true with each new section', () {
+      const a = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        facts: FactsSection(),
+      );
+      expect(a.hasContent, isTrue);
+
+      const b = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        workflows: WorkflowsSection(),
+      );
+      expect(b.hasContent, isTrue);
+
+      const c = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        pipelines: PipelinesSection(),
+      );
+      expect(c.hasContent, isTrue);
+
+      const d = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        runbooks: RunbooksSection(),
+      );
+      expect(d.hasContent, isTrue);
+
+      const e = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        tools: ToolsSection(),
+      );
+      expect(e.hasContent, isTrue);
+    });
+
+    test('presentSections lists each new section', () {
+      const bundle = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        facts: FactsSection(),
+        workflows: WorkflowsSection(),
+        pipelines: PipelinesSection(),
+        runbooks: RunbooksSection(),
+        tools: ToolsSection(),
+      );
+      expect(
+        bundle.presentSections,
+        containsAll(['facts', 'workflows', 'pipelines', 'runbooks', 'tools']),
+      );
+    });
+
+    test('copyWith preserves and overrides new sections', () {
+      const original = McpBundle(
+        manifest: BundleManifest(id: 'b', name: 'B', version: '1.0.0'),
+        facts: FactsSection(),
+      );
+      final copy = original.copyWith(
+        workflows: const WorkflowsSection(),
+        runbooks: const RunbooksSection(),
+        tools: const ToolsSection(),
+      );
+      expect(copy.facts, isNotNull);
+      expect(copy.workflows, isNotNull);
+      expect(copy.runbooks, isNotNull);
+      expect(copy.tools, isNotNull);
+      expect(copy.pipelines, isNull);
+    });
+
+    test('0.3.2 baseline shape — fromJson without new keys leaves 5 fields null', () {
+      // Simulates a manifest.json produced by 0.3.2 (knowledge / skills /
+      // profiles / philosophy / agents but no facts / workflows / pipelines /
+      // runbooks). Round-trip must keep the 4 new fields null and leave the
+      // pre-existing sections intact.
+      final json = {
+        'schemaVersion': '1.0.0',
+        'manifest': {'id': 'legacy', 'name': 'Legacy', 'version': '0.3.2'},
+        'knowledge': {'schemaVersion': '1.0.0'},
+        'skills': {'schemaVersion': '1.0.0'},
+        'profiles': <String, dynamic>{},
+        'philosophy': <String, dynamic>{},
+        'agents': <String, dynamic>{},
+      };
+
+      final bundle = McpBundle.fromJson(json);
+      expect(bundle.knowledge, isNotNull);
+      expect(bundle.skills, isNotNull);
+      expect(bundle.profiles, isNotNull);
+      expect(bundle.philosophy, isNotNull);
+      expect(bundle.agents, isNotNull);
+
+      expect(bundle.facts, isNull);
+      expect(bundle.workflows, isNull);
+      expect(bundle.pipelines, isNull);
+      expect(bundle.runbooks, isNull);
+      expect(bundle.tools, isNull);
+
+      // Re-emit must not introduce new keys for null sections.
+      final reEmit = bundle.toJson();
+      expect(reEmit.containsKey('facts'), isFalse);
+      expect(reEmit.containsKey('workflows'), isFalse);
+      expect(reEmit.containsKey('pipelines'), isFalse);
+      expect(reEmit.containsKey('runbooks'), isFalse);
+      expect(reEmit.containsKey('tools'), isFalse);
     });
   });
 

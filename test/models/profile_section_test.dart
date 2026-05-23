@@ -46,6 +46,47 @@ void main() {
       );
     });
 
+    test('schemaVersion default is 1.0.0', () {
+      const section = ProfilesSection();
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('toJson always emits schemaVersion', () {
+      const section = ProfilesSection();
+      final json = section.toJson();
+      expect(json['schemaVersion'], equals('1.0.0'));
+    });
+
+    test('fromJson defaults schemaVersion to 1.0.0 when absent', () {
+      final section = ProfilesSection.fromJson({});
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson preserves explicit schemaVersion', () {
+      final section = ProfilesSection.fromJson({'schemaVersion': '2.0.0'});
+      expect(section.schemaVersion, equals('2.0.0'));
+    });
+
+    test('round-trip preserves schemaVersion', () {
+      const original = ProfilesSection(
+        schemaVersion: '1.5.0',
+        profiles: [
+          ProfileDefinition(id: 'p1', name: 'A'),
+          ProfileDefinition(id: 'p2', name: 'B'),
+        ],
+      );
+      final json = original.toJson();
+      final restored = ProfilesSection.fromJson(json);
+      expect(restored.schemaVersion, equals('1.5.0'));
+      expect(restored.profiles, hasLength(2));
+    });
+
+    test('copyWith preserves schemaVersion when not overridden', () {
+      const original = ProfilesSection(schemaVersion: '3.0.0');
+      final copy = original.copyWith();
+      expect(copy.schemaVersion, equals('3.0.0'));
+    });
+
     test('getProfile found', () {
       const section = ProfilesSection(
         profiles: [

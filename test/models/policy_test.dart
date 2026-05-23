@@ -87,6 +87,49 @@ void main() {
       });
     });
 
+    group('schemaVersion', () {
+      test('default is 1.0.0', () {
+        const section = PolicySection();
+        expect(section.schemaVersion, equals('1.0.0'));
+      });
+
+      test('toJson always emits schemaVersion', () {
+        const section = PolicySection();
+        final json = section.toJson();
+        expect(json['schemaVersion'], equals('1.0.0'));
+      });
+
+      test('fromJson defaults schemaVersion to 1.0.0 when absent', () {
+        final section = PolicySection.fromJson({});
+        expect(section.schemaVersion, equals('1.0.0'));
+      });
+
+      test('fromJson preserves explicit schemaVersion', () {
+        final section = PolicySection.fromJson({'schemaVersion': '2.0.0'});
+        expect(section.schemaVersion, equals('2.0.0'));
+      });
+
+      test('round-trip preserves schemaVersion', () {
+        const original = PolicySection(
+          schemaVersion: '1.5.0',
+          policies: [
+            Policy(id: 'p1', name: 'A', rules: []),
+            Policy(id: 'p2', name: 'B', rules: []),
+          ],
+        );
+        final json = original.toJson();
+        final restored = PolicySection.fromJson(json);
+        expect(restored.schemaVersion, equals('1.5.0'));
+        expect(restored.policies, hasLength(2));
+      });
+
+      test('copyWith preserves schemaVersion when not overridden', () {
+        const original = PolicySection(schemaVersion: '3.0.0');
+        final copy = original.copyWith();
+        expect(copy.schemaVersion, equals('3.0.0'));
+      });
+    });
+
     group('findById', () {
       test('finds existing policy by ID', () {
         const section = PolicySection(

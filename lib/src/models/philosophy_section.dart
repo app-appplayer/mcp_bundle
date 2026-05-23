@@ -8,16 +8,21 @@ library;
 
 /// A section containing philosophy definitions.
 class PhilosophySection {
+  /// Schema version for this section. Default `'1.0.0'`.
+  final String schemaVersion;
+
   /// Philosophies defined in this section.
   final List<Philosophy> philosophies;
 
   const PhilosophySection({
+    this.schemaVersion = '1.0.0',
     this.philosophies = const [],
   });
 
   /// Create from JSON.
   factory PhilosophySection.fromJson(Map<String, dynamic> json) {
     return PhilosophySection(
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
       philosophies: (json['philosophies'] as List<dynamic>?)
               ?.map((e) => Philosophy.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -27,6 +32,7 @@ class PhilosophySection {
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        'schemaVersion': schemaVersion,
         if (philosophies.isNotEmpty)
           'philosophies': philosophies.map((p) => p.toJson()).toList(),
       };
@@ -47,9 +53,11 @@ class PhilosophySection {
 
   /// Create a copy with modifications.
   PhilosophySection copyWith({
+    String? schemaVersion,
     List<Philosophy>? philosophies,
   }) {
     return PhilosophySection(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       philosophies: philosophies ?? this.philosophies,
     );
   }

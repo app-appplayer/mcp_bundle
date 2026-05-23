@@ -10,9 +10,47 @@ void main() {
       expect(section.isNotEmpty, isFalse);
     });
 
-    test('empty section toJson omits philosophies key', () {
+    test('empty section toJson keeps schemaVersion and omits philosophies key',
+        () {
       const section = PhilosophySection();
-      expect(section.toJson(), isEmpty);
+      final json = section.toJson();
+      expect(json['schemaVersion'], equals('1.0.0'));
+      expect(json.containsKey('philosophies'), isFalse);
+    });
+
+    test('schemaVersion default is 1.0.0', () {
+      const section = PhilosophySection();
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson defaults schemaVersion to 1.0.0 when absent', () {
+      final section = PhilosophySection.fromJson(<String, dynamic>{});
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson preserves explicit schemaVersion', () {
+      final section = PhilosophySection.fromJson({'schemaVersion': '1.2.0'});
+      expect(section.schemaVersion, equals('1.2.0'));
+    });
+
+    test('round-trip preserves schemaVersion', () {
+      const original = PhilosophySection(
+        schemaVersion: '1.5.0',
+        philosophies: [
+          Philosophy(id: 'p1', name: 'P1', statement: 's'),
+          Philosophy(id: 'p2', name: 'P2', statement: 's'),
+        ],
+      );
+      final json = original.toJson();
+      final round = PhilosophySection.fromJson(json);
+      expect(round.schemaVersion, equals('1.5.0'));
+      expect(round.philosophies, hasLength(2));
+    });
+
+    test('copyWith preserves schemaVersion when not overridden', () {
+      const original = PhilosophySection(schemaVersion: '2.0.0');
+      final copy = original.copyWith();
+      expect(copy.schemaVersion, equals('2.0.0'));
     });
 
     test('fromJson with empty map', () {

@@ -72,7 +72,7 @@ void main() {
         final bundle = McpBundleLoader.fromJson(json);
         expect(bundle.ui, isNotNull);
         expect(bundle.ui!.pages, hasLength(1));
-        expect(bundle.ui!.pages.first.id, equals('home'));
+        expect(bundle.ui!.pages.values.first.id, equals('home'));
       });
 
       test('loads bundle with skills section', () {

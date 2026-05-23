@@ -10,9 +10,46 @@ void main() {
       expect(section.isNotEmpty, isFalse);
     });
 
-    test('empty section toJson omits agents key', () {
+    test('empty section toJson keeps schemaVersion and omits agents key', () {
       const section = AgentsSection();
-      expect(section.toJson(), isEmpty);
+      final json = section.toJson();
+      expect(json['schemaVersion'], equals('1.0.0'));
+      expect(json.containsKey('agents'), isFalse);
+    });
+
+    test('schemaVersion default is 1.0.0', () {
+      const section = AgentsSection();
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson defaults schemaVersion to 1.0.0 when absent', () {
+      final section = AgentsSection.fromJson(<String, dynamic>{});
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson preserves explicit schemaVersion', () {
+      final section = AgentsSection.fromJson({'schemaVersion': '1.2.0'});
+      expect(section.schemaVersion, equals('1.2.0'));
+    });
+
+    test('round-trip preserves schemaVersion', () {
+      const original = AgentsSection(
+        schemaVersion: '1.5.0',
+        agents: [
+          AgentDefinition(id: 'a', name: 'A', role: 'r'),
+          AgentDefinition(id: 'b', name: 'B', role: 'r'),
+        ],
+      );
+      final json = original.toJson();
+      final round = AgentsSection.fromJson(json);
+      expect(round.schemaVersion, equals('1.5.0'));
+      expect(round.agents, hasLength(2));
+    });
+
+    test('copyWith preserves schemaVersion when not overridden', () {
+      const original = AgentsSection(schemaVersion: '2.0.0');
+      final copy = original.copyWith();
+      expect(copy.schemaVersion, equals('2.0.0'));
     });
 
     test('fromJson with empty map / null agents', () {
@@ -169,7 +206,7 @@ void main() {
     test('agents reserved folder + BundleFolder.values', () {
       expect(BundleFolder.agents.name, 'agents');
       expect(BundleFolder.values, contains(BundleFolder.agents));
-      expect(BundleFolder.values, hasLength(7));
+      expect(BundleFolder.values, hasLength(12));
     });
   });
 }

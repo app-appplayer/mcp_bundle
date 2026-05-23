@@ -11,6 +11,12 @@ class SkillSection {
   /// List of skill modules.
   final List<SkillModule> modules;
 
+  /// Self-mirror alias of [modules] for parity with other sections
+  /// (`agents.agents` · `tools.tools` · `facts.facts` etc.). Same list
+  /// reference; mutations on either side are visible. additive (no
+  /// shape change to JSON — toJson still emits `modules`).
+  List<SkillModule> get skills => modules;
+
   /// Shared skill configuration.
   final SkillConfig? config;
 

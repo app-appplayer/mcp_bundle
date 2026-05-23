@@ -1,6 +1,7 @@
 /// Tests for BundleResources — the read/write surface for the bundle's
 /// reserved sub-folders (`ui/`, `assets/`, `skills/`, `knowledge/`,
-/// `profiles/`, `philosophy/`).
+/// `facts/`, `workflows/`, `pipelines/`, `runbooks/`, `tools/`,
+/// `profiles/`, `philosophy/`, `agents/`).
 ///
 /// Contract under test: every consumer of a bundle (renderer, MCP
 /// server, designer, installer) goes through this surface instead of
@@ -28,6 +29,11 @@ void main() {
     Map<String, String> uiFiles = const {},
     Map<String, String> assetFiles = const {},
     Map<String, String> philosophyFiles = const {},
+    Map<String, String> factsFiles = const {},
+    Map<String, String> workflowsFiles = const {},
+    Map<String, String> pipelinesFiles = const {},
+    Map<String, String> runbooksFiles = const {},
+    Map<String, String> toolsFiles = const {},
   }) async {
     final mbd = await Directory('${tmp.path}/probe.mbd').create();
     await File('${mbd.path}/manifest.json').writeAsString('''
@@ -42,21 +48,22 @@ void main() {
   }
 }
 ''');
-    for (final entry in uiFiles.entries) {
-      final f = File('${mbd.path}/ui/${entry.key}');
-      await f.parent.create(recursive: true);
-      await f.writeAsString(entry.value);
+    Future<void> writeFolder(String folder, Map<String, String> files) async {
+      for (final entry in files.entries) {
+        final f = File('${mbd.path}/$folder/${entry.key}');
+        await f.parent.create(recursive: true);
+        await f.writeAsString(entry.value);
+      }
     }
-    for (final entry in assetFiles.entries) {
-      final f = File('${mbd.path}/assets/${entry.key}');
-      await f.parent.create(recursive: true);
-      await f.writeAsString(entry.value);
-    }
-    for (final entry in philosophyFiles.entries) {
-      final f = File('${mbd.path}/philosophy/${entry.key}');
-      await f.parent.create(recursive: true);
-      await f.writeAsString(entry.value);
-    }
+
+    await writeFolder('ui', uiFiles);
+    await writeFolder('assets', assetFiles);
+    await writeFolder('philosophy', philosophyFiles);
+    await writeFolder('facts', factsFiles);
+    await writeFolder('workflows', workflowsFiles);
+    await writeFolder('pipelines', pipelinesFiles);
+    await writeFolder('runbooks', runbooksFiles);
+    await writeFolder('tools', toolsFiles);
     return McpBundleLoader.loadDirectory(mbd.path);
   }
 
@@ -227,8 +234,14 @@ void main() {
       expect(bundle.assetResources.folder.name, equals('assets'));
       expect(bundle.skillResources.folder.name, equals('skills'));
       expect(bundle.knowledgeResources.folder.name, equals('knowledge'));
+      expect(bundle.factsResources.folder.name, equals('facts'));
+      expect(bundle.workflowsResources.folder.name, equals('workflows'));
+      expect(bundle.pipelinesResources.folder.name, equals('pipelines'));
+      expect(bundle.runbooksResources.folder.name, equals('runbooks'));
+      expect(bundle.toolsResources.folder.name, equals('tools'));
       expect(bundle.profileResources.folder.name, equals('profiles'));
       expect(bundle.philosophyResources.folder.name, equals('philosophy'));
+      expect(bundle.agentResources.folder.name, equals('agents'));
     });
 
     test('philosophy folder is reachable end-to-end', () async {
@@ -250,8 +263,8 @@ void main() {
       expect(generic, equals(typed));
     });
 
-    test('BundleFolder.values enumerates all seven reserved folders', () {
-      expect(BundleFolder.values, hasLength(7));
+    test('BundleFolder.values enumerates all twelve reserved folders', () {
+      expect(BundleFolder.values, hasLength(12));
       expect(
         BundleFolder.values.map((f) => f.name).toList(),
         equals([
@@ -259,11 +272,118 @@ void main() {
           'assets',
           'skills',
           'knowledge',
+          'facts',
+          'workflows',
+          'pipelines',
+          'runbooks',
+          'tools',
           'profiles',
           'philosophy',
           'agents',
         ]),
       );
+    });
+  });
+
+  group('BundleResources — new folder round-trip (facts/workflows/'
+      'pipelines/runbooks/tools)', () {
+    test('facts folder: read / write / exists / list / delete round-trip',
+        () async {
+      final bundle = await writeMinimalBundle(factsFiles: {
+        'seed.json': '{"subject":"sun","predicate":"is","object":"star"}',
+      });
+      // read seeded
+      expect(
+        await bundle.factsResources.read('seed.json'),
+        equals('{"subject":"sun","predicate":"is","object":"star"}'),
+      );
+      // list
+      expect(
+        await bundle.factsResources.list(extension: '.json'),
+        equals(['seed.json']),
+      );
+      // write new
+      await bundle.factsResources.write('extra.json', '{"k":1}');
+      expect(await bundle.factsResources.exists('extra.json'), isTrue);
+      // delete
+      await bundle.factsResources.delete('extra.json');
+      expect(await bundle.factsResources.exists('extra.json'), isFalse);
+    });
+
+    test('workflows folder: read / write / exists / list / delete round-trip',
+        () async {
+      final bundle = await writeMinimalBundle(workflowsFiles: {
+        'onboarding.json': '{"id":"onboarding","steps":[]}',
+      });
+      expect(
+        await bundle.workflowsResources.read('onboarding.json'),
+        equals('{"id":"onboarding","steps":[]}'),
+      );
+      expect(
+        await bundle.workflowsResources.list(extension: '.json'),
+        equals(['onboarding.json']),
+      );
+      await bundle.workflowsResources.write('extra.json', '{"k":1}');
+      expect(await bundle.workflowsResources.exists('extra.json'), isTrue);
+      await bundle.workflowsResources.delete('extra.json');
+      expect(await bundle.workflowsResources.exists('extra.json'), isFalse);
+    });
+
+    test('pipelines folder: read / write / exists / list / delete round-trip',
+        () async {
+      final bundle = await writeMinimalBundle(pipelinesFiles: {
+        'deploy.json': '{"id":"deploy","stages":[]}',
+      });
+      expect(
+        await bundle.pipelinesResources.read('deploy.json'),
+        equals('{"id":"deploy","stages":[]}'),
+      );
+      expect(
+        await bundle.pipelinesResources.list(extension: '.json'),
+        equals(['deploy.json']),
+      );
+      await bundle.pipelinesResources.write('extra.json', '{"k":1}');
+      expect(await bundle.pipelinesResources.exists('extra.json'), isTrue);
+      await bundle.pipelinesResources.delete('extra.json');
+      expect(await bundle.pipelinesResources.exists('extra.json'), isFalse);
+    });
+
+    test('runbooks folder: read / write / exists / list / delete round-trip',
+        () async {
+      final bundle = await writeMinimalBundle(runbooksFiles: {
+        'incident.json': '{"id":"incident","procedure":[]}',
+      });
+      expect(
+        await bundle.runbooksResources.read('incident.json'),
+        equals('{"id":"incident","procedure":[]}'),
+      );
+      expect(
+        await bundle.runbooksResources.list(extension: '.json'),
+        equals(['incident.json']),
+      );
+      await bundle.runbooksResources.write('extra.json', '{"k":1}');
+      expect(await bundle.runbooksResources.exists('extra.json'), isTrue);
+      await bundle.runbooksResources.delete('extra.json');
+      expect(await bundle.runbooksResources.exists('extra.json'), isFalse);
+    });
+
+    test('tools folder: read / write / exists / list / delete round-trip',
+        () async {
+      final bundle = await writeMinimalBundle(toolsFiles: {
+        'echo.json': '{"name":"echo","kind":"host"}',
+      });
+      expect(
+        await bundle.toolsResources.read('echo.json'),
+        equals('{"name":"echo","kind":"host"}'),
+      );
+      expect(
+        await bundle.toolsResources.list(extension: '.json'),
+        equals(['echo.json']),
+      );
+      await bundle.toolsResources.write('extra.json', '{"k":1}');
+      expect(await bundle.toolsResources.exists('extra.json'), isTrue);
+      await bundle.toolsResources.delete('extra.json');
+      expect(await bundle.toolsResources.exists('extra.json'), isFalse);
     });
   });
 

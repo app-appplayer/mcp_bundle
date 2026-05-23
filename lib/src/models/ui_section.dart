@@ -21,15 +21,17 @@ class UiSection {
   /// Schema version for UI section.
   final String schemaVersion;
 
-  /// List of pages in the application.
+  /// Page definitions keyed by id — aligned with the mcp_ui_dsl 1.3
+  /// `app.schema.json` declaration `pages: type: object`. Routes
+  /// referencing `ui://pages/<id>` resolve against this map.
   ///
   /// Deprecated: read `ui/<rel>.json` files via `BundleResources`
-  /// instead of consulting this typed list.
+  /// instead of consulting this typed map.
   @Deprecated(
     'Read ui/ folder via BundleResources. UiSection typed fields '
     'remain only for forward-compat round-trip. Removal target 0.6.0.',
   )
-  final List<PageDefinition> pages;
+  final Map<String, PageDefinition> pages;
 
   /// Reusable widget definitions.
   @Deprecated(
@@ -68,7 +70,7 @@ class UiSection {
   // ignore: deprecated_member_use_from_same_package
   const UiSection({
     this.schemaVersion = '1.0.0',
-    this.pages = const [],
+    this.pages = const {},
     this.widgets = const {},
     this.theme,
     this.navigation,
@@ -76,15 +78,65 @@ class UiSection {
     this.raw = const {},
   });
 
+  /// Legacy list → map adapter. Generators and consumers that built
+  /// pages into a `List<PageDefinition>` (the pre-0.4.0 form) can call
+  /// this factory directly — the synthesized map uses `PageDefinition.id`
+  /// as the key. New code should use the literal map form
+  /// `UiSection(pages: {'id': PageDefinition(...)})`.
+  factory UiSection.fromPagesList(
+    List<PageDefinition> pages, {
+    String schemaVersion = '1.0.0',
+    Map<String, WidgetDefinition> widgets = const {},
+    ThemeConfig? theme,
+    NavigationConfig? navigation,
+    Map<String, StateDefinition> state = const {},
+    Map<String, dynamic> raw = const {},
+  }) {
+    final map = <String, PageDefinition>{};
+    for (final page in pages) {
+      map[page.id] = page;
+    }
+    return UiSection(
+      schemaVersion: schemaVersion,
+      pages: map,
+      widgets: widgets,
+      theme: theme,
+      navigation: navigation,
+      state: state,
+      raw: raw,
+    );
+  }
+
   factory UiSection.fromJson(Map<String, dynamic> json) {
-    // Accept both 'pages' and 'screens' (backward compat) keys
-    final pagesList = json['pages'] ?? json['screens'];
+    // Spec form (app.schema.json): `pages` is a Map<id, PageDefinition>.
+    // Legacy inputs (the `screens` alias, or the older list form) are
+    // accepted leniently and normalized to the map. List inputs use
+    // `PageDefinition.id` as the key (or empty string when missing).
+    final pagesRaw = json['pages'] ?? json['screens'];
+    final pagesMap = <String, PageDefinition>{};
+    if (pagesRaw is Map) {
+      pagesRaw.forEach((k, v) {
+        if (k is! String || v is! Map) return;
+        final m = Map<String, dynamic>.from(v as Map);
+        // The map key is the canonical id — fall back to it when the
+        // entry has no `id` field of its own.
+        m['id'] = (m['id'] is String && (m['id'] as String).isNotEmpty)
+            ? m['id']
+            : k;
+        pagesMap[k] = PageDefinition.fromJson(m);
+      });
+    } else if (pagesRaw is List) {
+      for (final entry in pagesRaw) {
+        if (entry is! Map) continue;
+        final page = PageDefinition.fromJson(
+          Map<String, dynamic>.from(entry),
+        );
+        pagesMap[page.id] = page;
+      }
+    }
     return UiSection(
       schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
-      pages: (pagesList as List<dynamic>?)
-              ?.map((e) => PageDefinition.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      pages: pagesMap,
       widgets: (json['widgets'] as Map<String, dynamic>?)?.map(
             (key, value) => MapEntry(
               key,
@@ -120,7 +172,9 @@ class UiSection {
     return {
       'schemaVersion': schemaVersion,
       // ignore: deprecated_member_use_from_same_package
-      if (pages.isNotEmpty) 'pages': pages.map((s) => s.toJson()).toList(),
+      if (pages.isNotEmpty)
+        // ignore: deprecated_member_use_from_same_package
+        'pages': pages.map((k, v) => MapEntry(k, v.toJson())),
       // ignore: deprecated_member_use_from_same_package
       if (widgets.isNotEmpty)
         // ignore: deprecated_member_use_from_same_package

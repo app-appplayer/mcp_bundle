@@ -19,15 +19,64 @@ void main() {
       expect(section.extraction, isNull);
     });
 
-    test('toJson with defaults produces version and mode', () {
+    test('toJson with defaults produces schemaVersion, version, and mode', () {
       const section = FactGraphSection();
       final json = section.toJson();
 
+      expect(json['schemaVersion'], equals('1.0.0'));
       expect(json['version'], equals('1.0.0'));
       expect(json['mode'], equals('embedded'));
       expect(json.containsKey('embedded'), isFalse);
       expect(json.containsKey('external'), isFalse);
       expect(json.containsKey('extraction'), isFalse);
+    });
+
+    test('schemaVersion default is 1.0.0', () {
+      const section = FactGraphSection();
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson defaults schemaVersion to 1.0.0 when absent', () {
+      final section = FactGraphSection.fromJson(<String, dynamic>{});
+      expect(section.schemaVersion, equals('1.0.0'));
+    });
+
+    test('fromJson preserves explicit schemaVersion (additive to version)',
+        () {
+      final section = FactGraphSection.fromJson({
+        'schemaVersion': '2.1.0',
+        'version': '3.0.0',
+      });
+      expect(section.schemaVersion, equals('2.1.0'));
+      expect(section.version, equals('3.0.0'));
+    });
+
+    test(
+        'legacy bundles without schemaVersion still preserve version field',
+        () {
+      // Backward compat — bundles authored before schemaVersion was added
+      // continue to expose `version` correctly while schemaVersion falls
+      // back to default `1.0.0`.
+      final section = FactGraphSection.fromJson({'version': '2.0.0'});
+      expect(section.schemaVersion, equals('1.0.0'));
+      expect(section.version, equals('2.0.0'));
+    });
+
+    test('round-trip preserves both schemaVersion and version', () {
+      const original = FactGraphSection(
+        schemaVersion: '1.5.0',
+        version: '4.2.0',
+      );
+      final json = original.toJson();
+      final restored = FactGraphSection.fromJson(json);
+      expect(restored.schemaVersion, equals('1.5.0'));
+      expect(restored.version, equals('4.2.0'));
+    });
+
+    test('copyWith preserves schemaVersion when not overridden', () {
+      const original = FactGraphSection(schemaVersion: '7.0.0');
+      final copy = original.copyWith();
+      expect(copy.schemaVersion, equals('7.0.0'));
     });
 
     test('roundtrip fromJson/toJson preserves all fields', () {

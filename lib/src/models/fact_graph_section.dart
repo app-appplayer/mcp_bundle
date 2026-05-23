@@ -6,7 +6,17 @@ library;
 
 /// A section containing embedded FactGraph data.
 class FactGraphSection {
-  /// Schema version.
+  /// Schema version for this section. Default `'1.0.0'`.
+  ///
+  /// Aligned with the common section pattern (every typed section
+  /// exposes `schemaVersion`). The legacy [version] field is preserved
+  /// for backward compatibility — both round-trip independently.
+  final String schemaVersion;
+
+  /// Legacy version field. Default `'1.0.0'`.
+  ///
+  /// Preserved for backward compatibility with bundles authored before
+  /// the section adopted the common `schemaVersion` slot.
   final String version;
 
   /// Storage mode: embedded, referenced, or hybrid.
@@ -22,6 +32,7 @@ class FactGraphSection {
   final ExtractionConfig? extraction;
 
   const FactGraphSection({
+    this.schemaVersion = '1.0.0',
     this.version = '1.0.0',
     this.mode = FactGraphMode.embedded,
     this.embedded,
@@ -32,6 +43,7 @@ class FactGraphSection {
   /// Create from JSON.
   factory FactGraphSection.fromJson(Map<String, dynamic> json) {
     return FactGraphSection(
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
       version: json['version'] as String? ?? '1.0.0',
       mode: FactGraphMode.fromString(json['mode'] as String?),
       embedded: json['embedded'] != null
@@ -51,6 +63,7 @@ class FactGraphSection {
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        'schemaVersion': schemaVersion,
         'version': version,
         'mode': mode.name,
         if (embedded != null) 'embedded': embedded!.toJson(),
@@ -60,6 +73,7 @@ class FactGraphSection {
 
   /// Create a copy with modifications.
   FactGraphSection copyWith({
+    String? schemaVersion,
     String? version,
     FactGraphMode? mode,
     EmbeddedFactGraphData? embedded,
@@ -67,6 +81,7 @@ class FactGraphSection {
     ExtractionConfig? extraction,
   }) {
     return FactGraphSection(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       version: version ?? this.version,
       mode: mode ?? this.mode,
       embedded: embedded ?? this.embedded,

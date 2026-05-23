@@ -63,21 +63,7 @@ class McpBundleWriter {
     }
 
     final absRoot = dir.absolute.path;
-    final manifestFile = File('$absRoot${Platform.pathSeparator}$manifestEntry');
-    final encoder = indent > 0
-        ? JsonEncoder.withIndent(' ' * indent)
-        : const JsonEncoder();
-    try {
-      await manifestFile.writeAsString(
-        encoder.convert(bundle.toJson()),
-        flush: true,
-      );
-    } catch (e) {
-      throw BundleWriteException(
-        'Failed to write $manifestEntry: $e',
-        uri: Uri.file(manifestFile.path),
-      );
-    }
+    await _writeManifestFile(bundle, absRoot, indent: indent);
 
     for (final entry in reservedFiles.entries) {
       final resources = BundleResources(
@@ -106,5 +92,66 @@ class McpBundleWriter {
     }
 
     return absRoot;
+  }
+
+  /// Write [bundle] 's `manifest.json` **only** — no reserved-folder
+  /// touch. Use for authoring tools that mutate the manifest in-memory
+  /// (load → `copyWith` → [writeManifest]) without rewriting the
+  /// `.mbd/` directory tree. Prefer this over [writeDirectory] for
+  /// partial updates: it has a fraction of the I/O cost of a full
+  /// rewrite, leaves disk-only files (`knowledge/`, `agents/`, … and
+  /// any author-side scratch) untouched, and races less with other
+  /// readers.
+  ///
+  /// **Consistency contract**: [writeManifest] does NOT enforce that
+  /// the manifest stays in sync with reserved-folder contents. If the
+  /// caller adds (e.g.) a new `manifest.knowledge.documents[i]` entry
+  /// whose `path` points into `knowledge/` without writing the file
+  /// there, the bundle becomes incoherent — subsequent
+  /// [McpBundleLoader.loadDirectory] will surface the missing file at
+  /// load time (per loader policy). For ops that touch both sides,
+  /// use [writeDirectory] with the full `reservedFiles` payload.
+  ///
+  /// [mbdPath] must already exist. Throws [BundleWriteException] when
+  /// the directory is missing or the manifest cannot be written.
+  static Future<void> writeManifest(
+    McpBundle bundle,
+    String mbdPath, {
+    int indent = 2,
+  }) async {
+    final dir = Directory(mbdPath);
+    if (!await dir.exists()) {
+      throw BundleWriteException(
+        'Bundle directory does not exist: $mbdPath',
+        uri: Uri.directory(dir.absolute.path),
+      );
+    }
+    await _writeManifestFile(bundle, dir.absolute.path, indent: indent);
+  }
+
+  /// Internal: serialise [bundle] and write `manifest.json` under
+  /// [absRoot]. Shared by [writeDirectory] and [writeManifest] so the
+  /// JSON-encode + flush path stays single-source.
+  static Future<void> _writeManifestFile(
+    McpBundle bundle,
+    String absRoot, {
+    required int indent,
+  }) async {
+    final manifestFile =
+        File('$absRoot${Platform.pathSeparator}$manifestEntry');
+    final encoder = indent > 0
+        ? JsonEncoder.withIndent(' ' * indent)
+        : const JsonEncoder();
+    try {
+      await manifestFile.writeAsString(
+        encoder.convert(bundle.toJson()),
+        flush: true,
+      );
+    } catch (e) {
+      throw BundleWriteException(
+        'Failed to write $manifestEntry: $e',
+        uri: Uri.file(manifestFile.path),
+      );
+    }
   }
 }

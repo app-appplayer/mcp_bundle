@@ -125,13 +125,13 @@ void main() {
       test('screen with empty id produces MISSING_REQUIRED', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: '',
               name: 'Home',
               root: const WidgetNode(type: 'Container'),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -139,7 +139,7 @@ void main() {
           result.errors.any(
             (e) =>
                 e.code == McpValidationCodes.missingRequired &&
-                e.location == 'ui.pages[0].id',
+                e.location == 'ui.pages[home].id',
           ),
           isTrue,
         );
@@ -148,13 +148,13 @@ void main() {
       test('screen with invalid id pattern produces INVALID_PATTERN', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: '123-bad',
               name: 'Home',
               root: const WidgetNode(type: 'Container'),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -162,7 +162,7 @@ void main() {
           result.errors.any(
             (e) =>
                 e.code == McpValidationCodes.invalidPattern &&
-                e.location == 'ui.pages[0].id',
+                e.location == 'ui.pages[home].id',
           ),
           isTrue,
         );
@@ -171,18 +171,18 @@ void main() {
       test('duplicate screen ids produces DUPLICATE_ID', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home_a': PageDefinition(
               id: 'home',
               name: 'Home',
               root: const WidgetNode(type: 'Container'),
             ),
-            PageDefinition(
+            'home_b': PageDefinition(
               id: 'home',
               name: 'Home2',
               root: const WidgetNode(type: 'Container'),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -190,7 +190,7 @@ void main() {
           result.errors.any(
             (e) =>
                 e.code == McpValidationCodes.duplicateId &&
-                e.location == 'ui.pages[1].id',
+                e.location == 'ui.pages[home_b].id',
           ),
           isTrue,
         );
@@ -199,13 +199,13 @@ void main() {
       test('widget with empty type produces MISSING_REQUIRED', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: 'home',
               name: 'Home',
               root: const WidgetNode(type: ''),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -213,7 +213,7 @@ void main() {
           result.errors.any(
             (e) =>
                 e.code == McpValidationCodes.missingRequired &&
-                e.location == 'ui.pages[0].root.type',
+                e.location == 'ui.pages[home].root.type',
           ),
           isTrue,
         );
@@ -222,8 +222,8 @@ void main() {
       test('callSkill action with null target produces MISSING_REQUIRED', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: 'home',
               name: 'Home',
               root: WidgetNode(
@@ -236,7 +236,7 @@ void main() {
                 },
               ),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -253,8 +253,8 @@ void main() {
       test('navigate action with null target produces MISSING_REQUIRED', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: 'home',
               name: 'Home',
               root: WidgetNode(
@@ -267,7 +267,7 @@ void main() {
                 },
               ),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -284,8 +284,8 @@ void main() {
       test('validates children widgets recursively', () {
         final bundle = McpBundle(
           manifest: validManifest(),
-          ui: UiSection(pages: [
-            PageDefinition(
+          ui: UiSection(pages: {
+            'home': PageDefinition(
               id: 'home',
               name: 'Home',
               root: WidgetNode(
@@ -295,7 +295,7 @@ void main() {
                 ],
               ),
             ),
-          ]),
+          }),
         );
         final result = McpBundleValidator.validate(bundle);
         expect(result.isValid, isFalse);
@@ -303,7 +303,7 @@ void main() {
           result.errors.any(
             (e) =>
                 e.code == McpValidationCodes.missingRequired &&
-                e.location == 'ui.pages[0].root.children[0].type',
+                e.location == 'ui.pages[home].root.children[0].type',
           ),
           isTrue,
         );

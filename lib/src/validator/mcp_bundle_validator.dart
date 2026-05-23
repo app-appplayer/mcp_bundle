@@ -12,11 +12,17 @@ import '../models/skill_section.dart';
 import '../models/asset.dart';
 import '../models/knowledge.dart';
 import '../models/binding.dart';
+import '../models/facts_section.dart';
+import '../models/pipelines_section.dart';
 import '../models/profile_section.dart';
+import '../models/runbooks_section.dart';
 import '../models/test_section.dart';
+import '../models/requires_section.dart';
+import '../models/tools_section.dart';
 import '../models/policy.dart';
 import '../models/fact_graph_schema.dart';
 import '../models/integrity.dart';
+import '../models/workflows_section.dart';
 import '../expression/lexer.dart';
 import '../expression/parser.dart';
 import 'validation_result.dart';
@@ -150,6 +156,24 @@ class McpBundleValidator {
     if (bundle.tests != null) {
       errors.addAll(_validateTestSection(bundle.tests!));
     }
+    if (bundle.facts != null) {
+      errors.addAll(_validateFactsSection(bundle.facts!));
+    }
+    if (bundle.workflows != null) {
+      errors.addAll(_validateWorkflowsSection(bundle.workflows!));
+    }
+    if (bundle.pipelines != null) {
+      errors.addAll(_validatePipelinesSection(bundle.pipelines!));
+    }
+    if (bundle.runbooks != null) {
+      errors.addAll(_validateRunbooksSection(bundle.runbooks!));
+    }
+    if (bundle.tools != null) {
+      errors.addAll(_validateToolsSection(bundle.tools!));
+    }
+    if (bundle.requires != null) {
+      errors.addAll(_validateRequiresSection(bundle.requires!));
+    }
 
     // Validate expression syntax in all sections
     errors.addAll(_validateExpressions(bundle));
@@ -217,9 +241,10 @@ class McpBundleValidator {
     final errors = <ValidationError>[];
     final pageIds = <String>{};
 
-    for (var i = 0; i < ui.pages.length; i++) {
-      final page = ui.pages[i];
-      final path = 'ui.pages[$i]';
+    for (final entry in ui.pages.entries) {
+      final key = entry.key;
+      final page = entry.value;
+      final path = 'ui.pages[$key]';
 
       // Required: id
       if (page.id.isEmpty) {
@@ -1031,6 +1056,261 @@ class McpBundleValidator {
     return errors;
   }
 
+  // ==================== Facts Section Validation ====================
+
+  static List<ValidationError> _validateFactsSection(FactsSection facts) {
+    final errors = <ValidationError>[];
+    final factIds = <String>{};
+
+    for (var i = 0; i < facts.facts.length; i++) {
+      final fact = facts.facts[i];
+      final path = 'facts.facts[$i]';
+
+      // Required: subject
+      if (fact.subject.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Fact subject is required',
+          location: '$path.subject',
+        ));
+      }
+
+      // Required: predicate
+      if (fact.predicate.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Fact predicate is required',
+          location: '$path.predicate',
+        ));
+      }
+
+      // Duplicate id check (only for facts with an id)
+      if (fact.id != null && fact.id!.isNotEmpty) {
+        if (factIds.contains(fact.id)) {
+          errors.add(ValidationError(
+            code: McpValidationCodes.duplicateId,
+            message: 'Duplicate fact id: ${fact.id}',
+            location: '$path.id',
+          ));
+        }
+        factIds.add(fact.id!);
+      }
+
+      // Confidence range (clamped at parse, but explicit construction can violate)
+      if (fact.confidence != null) {
+        if (fact.confidence! < 0.0 || fact.confidence! > 1.0) {
+          errors.add(ValidationError(
+            code: McpValidationCodes.invalidValue,
+            message: 'Fact confidence must be between 0.0 and 1.0',
+            location: '$path.confidence',
+          ));
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  // ==================== Workflows Section Validation ====================
+
+  static List<ValidationError> _validateWorkflowsSection(
+    WorkflowsSection workflows,
+  ) {
+    final errors = <ValidationError>[];
+    final workflowIds = <String>{};
+
+    for (var i = 0; i < workflows.workflows.length; i++) {
+      final wf = workflows.workflows[i];
+      final path = 'workflows.workflows[$i]';
+
+      if (wf.id.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Workflow id is required',
+          location: '$path.id',
+        ));
+      }
+
+      if (wf.name.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Workflow name is required',
+          location: '$path.name',
+        ));
+      }
+
+      if (workflowIds.contains(wf.id)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.duplicateId,
+          message: 'Duplicate workflow id: ${wf.id}',
+          location: '$path.id',
+        ));
+      }
+      workflowIds.add(wf.id);
+    }
+
+    return errors;
+  }
+
+  // ==================== Pipelines Section Validation ====================
+
+  static List<ValidationError> _validatePipelinesSection(
+    PipelinesSection pipelines,
+  ) {
+    final errors = <ValidationError>[];
+    final pipelineIds = <String>{};
+
+    for (var i = 0; i < pipelines.pipelines.length; i++) {
+      final pl = pipelines.pipelines[i];
+      final path = 'pipelines.pipelines[$i]';
+
+      if (pl.id.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Pipeline id is required',
+          location: '$path.id',
+        ));
+      }
+
+      if (pl.name.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Pipeline name is required',
+          location: '$path.name',
+        ));
+      }
+
+      if (pipelineIds.contains(pl.id)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.duplicateId,
+          message: 'Duplicate pipeline id: ${pl.id}',
+          location: '$path.id',
+        ));
+      }
+      pipelineIds.add(pl.id);
+    }
+
+    return errors;
+  }
+
+  // ==================== Runbooks Section Validation ====================
+
+  static List<ValidationError> _validateRunbooksSection(
+    RunbooksSection runbooks,
+  ) {
+    final errors = <ValidationError>[];
+    final runbookIds = <String>{};
+
+    for (var i = 0; i < runbooks.runbooks.length; i++) {
+      final rb = runbooks.runbooks[i];
+      final path = 'runbooks.runbooks[$i]';
+
+      if (rb.id.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Runbook id is required',
+          location: '$path.id',
+        ));
+      }
+
+      if (rb.name.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Runbook name is required',
+          location: '$path.name',
+        ));
+      }
+
+      if (runbookIds.contains(rb.id)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.duplicateId,
+          message: 'Duplicate runbook id: ${rb.id}',
+          location: '$path.id',
+        ));
+      }
+      runbookIds.add(rb.id);
+    }
+
+    return errors;
+  }
+
+  // ==================== Tools Section Validation ====================
+
+  static List<ValidationError> _validateToolsSection(ToolsSection tools) {
+    final errors = <ValidationError>[];
+    final toolNames = <String>{};
+
+    for (var i = 0; i < tools.tools.length; i++) {
+      final tool = tools.tools[i];
+      final path = 'tools.tools[$i]';
+
+      // Required: name (non-empty)
+      if (tool.name.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Tool name is required',
+          location: '$path.name',
+        ));
+      }
+
+      // kind must not be unknown
+      if (tool.kind == ToolKind.unknown) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.invalidValue,
+          message: 'Tool kind must be one of host/mcp/cloud/js',
+          location: '$path.kind',
+        ));
+      }
+
+      // Duplicate name check (within section)
+      if (tool.name.isNotEmpty) {
+        if (toolNames.contains(tool.name)) {
+          errors.add(ValidationError(
+            code: McpValidationCodes.duplicateId,
+            message: 'Duplicate tool name: ${tool.name}',
+            location: '$path.name',
+          ));
+        }
+        toolNames.add(tool.name);
+      }
+    }
+
+    return errors;
+  }
+
+  // ==================== Requires Section Validation ====================
+
+  static List<ValidationError> _validateRequiresSection(
+      RequiresSection requires) {
+    final errors = <ValidationError>[];
+
+    void checkList(List<String> list, String key) {
+      final seen = <String>{};
+      for (var i = 0; i < list.length; i++) {
+        final v = list[i];
+        if (v.isEmpty) {
+          errors.add(ValidationError(
+            code: McpValidationCodes.missingRequired,
+            message: 'Empty entry at requires.$key[$i]',
+            location: 'requires.$key[$i]',
+          ));
+        }
+        if (!seen.add(v)) {
+          errors.add(ValidationError(
+            code: McpValidationCodes.duplicateId,
+            message: 'Duplicate entry "$v" in requires.$key',
+            location: 'requires.$key[$i]',
+          ));
+        }
+      }
+    }
+
+    checkList(requires.builtinAtoms, 'builtinAtoms');
+    checkList(requires.builtinTools, 'builtinTools');
+
+    return errors;
+  }
+
   // ==================== Expression Syntax Validation ====================
 
   static List<ValidationError> _validateExpressionSyntax(
@@ -1295,13 +1575,13 @@ class McpBundleValidator {
     final skillIds =
         bundle.skills?.modules.map((m) => m.id).toSet() ?? {};
     final pageIds =
-        bundle.ui?.pages.map((s) => s.id).toSet() ?? {};
+        bundle.ui?.pages.values.map((s) => s.id).toSet() ?? <String>{};
     final knowledgeSourceIds =
         bundle.knowledge?.sources.map((s) => s.id).toSet() ?? {};
 
     // Validate UI → skill references and UI → page navigation
     if (bundle.ui != null) {
-      for (final page in bundle.ui!.pages) {
+      for (final page in bundle.ui!.pages.values) {
         _validateWidgetReferences(
           page.root,
           skillIds,
@@ -1474,7 +1754,8 @@ class McpBundleValidator {
     }
 
     // Page → skill edges via UI actions
-    for (final page in bundle.ui?.pages ?? <PageDefinition>[]) {
+    for (final page
+        in bundle.ui?.pages.values ?? const <PageDefinition>[]) {
       final pageId = 'page:${page.id}';
       graph.putIfAbsent(pageId, () => []);
       _collectWidgetDeps(page.root, pageId, graph);

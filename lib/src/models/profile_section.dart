@@ -5,16 +5,21 @@ library;
 
 /// A section containing profile definitions.
 class ProfilesSection {
+  /// Schema version for this section. Default `'1.0.0'`.
+  final String schemaVersion;
+
   /// List of profiles in this section.
   final List<ProfileDefinition> profiles;
 
   const ProfilesSection({
+    this.schemaVersion = '1.0.0',
     this.profiles = const [],
   });
 
   /// Create from JSON.
   factory ProfilesSection.fromJson(Map<String, dynamic> json) {
     return ProfilesSection(
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0.0',
       profiles: (json['profiles'] as List<dynamic>?)
               ?.map((e) => ProfileDefinition.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -24,6 +29,7 @@ class ProfilesSection {
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        'schemaVersion': schemaVersion,
         'profiles': profiles.map((p) => p.toJson()).toList(),
       };
 
@@ -43,9 +49,11 @@ class ProfilesSection {
 
   /// Create a copy with modifications.
   ProfilesSection copyWith({
+    String? schemaVersion,
     List<ProfileDefinition>? profiles,
   }) {
     return ProfilesSection(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       profiles: profiles ?? this.profiles,
     );
   }

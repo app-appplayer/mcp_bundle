@@ -8,7 +8,7 @@ import 'dart:typed_data';
 
 import 'exceptions.dart';
 
-/// The seven reserved folder names in a bundle's `.mbd/` tree.
+/// The twelve reserved folder names in a bundle's `.mbd/` tree.
 ///
 /// Each name maps 1:1 to a sub-directory under the bundle root. Consumer
 /// adapters interpret the folder's contents in domain-specific ways
@@ -29,6 +29,31 @@ class BundleFolder {
   /// Knowledge sources, retriever configs.
   static const knowledge = BundleFolder._('knowledge');
 
+  /// Atomic subject-predicate-object fact records (typically newline-
+  /// delimited or per-fact JSON files). Companion to the inline
+  /// `manifest.facts[]` carry — large-volume facts live here.
+  static const facts = BundleFolder._('facts');
+
+  /// Workflow definitions — ordered step sequences. Companion to the
+  /// inline `manifest.workflows[]` carry — large or generated workflow
+  /// definitions live here as standalone files.
+  static const workflows = BundleFolder._('workflows');
+
+  /// Pipeline definitions — ordered stage sequences for data / build /
+  /// deploy flows. Companion to the inline `manifest.pipelines[]` carry.
+  static const pipelines = BundleFolder._('pipelines');
+
+  /// Runbook definitions — ordered procedure sequences for operational
+  /// tasks (incident response, recovery, routine maintenance). Companion
+  /// to the inline `manifest.runbooks[]` carry.
+  static const runbooks = BundleFolder._('runbooks');
+
+  /// Tool definitions — host-callable tool entries (host builtin / MCP
+  /// server / cloud endpoint / bundled JS). Companion to the inline
+  /// `manifest.tools[]` carry — large schemas or bundled JS sources live
+  /// here as standalone files.
+  static const tools = BundleFolder._('tools');
+
   /// Profile definitions.
   static const profiles = BundleFolder._('profiles');
 
@@ -44,6 +69,11 @@ class BundleFolder {
     assets,
     skills,
     knowledge,
+    facts,
+    workflows,
+    pipelines,
+    runbooks,
+    tools,
     profiles,
     philosophy,
     agents,
