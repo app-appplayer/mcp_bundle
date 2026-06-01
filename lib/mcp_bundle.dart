@@ -29,6 +29,7 @@ export 'src/models/facts_section.dart';
 export 'src/models/workflows_section.dart';
 export 'src/models/pipelines_section.dart';
 export 'src/models/runbooks_section.dart';
+export 'src/models/behavior_section.dart';
 export 'src/models/tools_section.dart';
 export 'src/models/requires_section.dart';
 export 'src/models/fact_graph_section.dart' hide ValidationRule;

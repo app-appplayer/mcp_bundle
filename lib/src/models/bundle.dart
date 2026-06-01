@@ -28,6 +28,7 @@ import 'tools_section.dart';
 import 'ui_section.dart';
 import 'wiring_section.dart';
 import 'workflows_section.dart';
+import 'behavior_section.dart';
 
 /// A complete MCP Bundle containing all packaged resources.
 class McpBundle {
@@ -85,6 +86,10 @@ class McpBundle {
   /// Runbooks section — ordered procedure sequences carried inline in
   /// `manifest.json` under the `runbooks` key.
   final RunbooksSection? runbooks;
+
+  /// Behavior section — unified behavior definitions (the successor to
+  /// flow/pipeline/runbook), carried inline under the `behavior` key.
+  final BehaviorSection? behavior;
 
   /// Tools section — host-callable tool entries (host builtin / MCP /
   /// cloud / bundled JS) carried inline in `manifest.json` under the
@@ -157,6 +162,7 @@ class McpBundle {
     this.workflows,
     this.pipelines,
     this.runbooks,
+    this.behavior,
     this.tools,
     this.requires,
     this.factGraphSchema,
@@ -223,6 +229,9 @@ class McpBundle {
       runbooks: json['runbooks'] != null
           ? RunbooksSection.fromJson(json['runbooks'] as Map<String, dynamic>)
           : null,
+      behavior: json['behavior'] != null
+          ? BehaviorSection.fromJson(json['behavior'] as Map<String, dynamic>)
+          : null,
       tools: json['tools'] != null
           ? ToolsSection.fromJson(json['tools'] as Map<String, dynamic>)
           : null,
@@ -271,7 +280,7 @@ class McpBundle {
       'schemaVersion', 'manifest', 'ui', 'flow', 'skills', 'assets',
       'knowledge', 'bindings', 'tests', 'policies', 'profiles',
       'philosophy', 'agents', 'facts', 'workflows', 'pipelines',
-      'runbooks', 'tools', 'requires', 'factGraphSchema',
+      'runbooks', 'behavior', 'tools', 'requires', 'factGraphSchema',
       'factGraphSection', 'compatibility', 'integrity', 'chat',
       'wiring', 'settings', 'extensions',
     };
@@ -325,6 +334,7 @@ class McpBundle {
       if (workflows != null) 'workflows': workflows!.toJson(),
       if (pipelines != null) 'pipelines': pipelines!.toJson(),
       if (runbooks != null) 'runbooks': runbooks!.toJson(),
+      if (behavior != null) 'behavior': behavior!.toJson(),
       if (tools != null) 'tools': tools!.toJson(),
       if (requires != null) 'requires': requires!.toJson(),
       if (factGraphSchema != null) 'factGraphSchema': factGraphSchema!.toJson(),
@@ -376,6 +386,7 @@ class McpBundle {
     WorkflowsSection? workflows,
     PipelinesSection? pipelines,
     RunbooksSection? runbooks,
+    BehaviorSection? behavior,
     ToolsSection? tools,
     RequiresSection? requires,
     FactGraphSchema? factGraphSchema,
@@ -406,6 +417,7 @@ class McpBundle {
       workflows: workflows ?? this.workflows,
       pipelines: pipelines ?? this.pipelines,
       runbooks: runbooks ?? this.runbooks,
+      behavior: behavior ?? this.behavior,
       tools: tools ?? this.tools,
       requires: requires ?? this.requires,
       factGraphSchema: factGraphSchema ?? this.factGraphSchema,
@@ -437,6 +449,7 @@ class McpBundle {
       workflows != null ||
       pipelines != null ||
       runbooks != null ||
+      behavior != null ||
       tools != null ||
       requires != null ||
       factGraphSchema != null ||
@@ -463,6 +476,7 @@ class McpBundle {
     if (workflows != null) sections.add('workflows');
     if (pipelines != null) sections.add('pipelines');
     if (runbooks != null) sections.add('runbooks');
+    if (behavior != null) sections.add('behavior');
     if (tools != null) sections.add('tools');
     if (requires != null) sections.add('requires');
     if (factGraphSchema != null) sections.add('factGraphSchema');

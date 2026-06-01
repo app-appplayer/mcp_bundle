@@ -117,7 +117,7 @@ class UiSection {
     if (pagesRaw is Map) {
       pagesRaw.forEach((k, v) {
         if (k is! String || v is! Map) return;
-        final m = Map<String, dynamic>.from(v as Map);
+        final m = Map<String, dynamic>.from(v);
         // The map key is the canonical id — fall back to it when the
         // entry has no `id` field of its own.
         m['id'] = (m['id'] is String && (m['id'] as String).isNotEmpty)

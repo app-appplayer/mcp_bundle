@@ -1,3 +1,16 @@
+## [0.4.1] - 2026-05-30 - Behavior section schema (additive)
+
+### Added
+- `BehaviorSection` / `BehaviorDefinition` / `BehaviorStepDef` — new model classes under `lib/src/models/behavior_section.dart`. A behavior definition is an ordered list of declarative steps; each step carries `do` (tool/skill invocation map), `when` (guard expression), `then` (outcome routing map), `dependsOn` (step dependency list), and `onFailure` (failure jump target). The host kernel maps these to its execution engine; this section is the serializable carrier only.
+- `McpBundle.behavior` — optional `BehaviorSection?` field wired through `fromJson` / `toJson` / `copyWith` / `hasContent` / `presentSections`. Emitted under the `behavior` key; omitted when null so existing bundles round-trip byte-identical.
+- `behavior_section.dart` exported from the main `mcp_bundle` barrel.
+- 5 new regression tests (`test/models/behavior_section_test.dart`). Total: 5065 PASS.
+
+### Backward compatibility
+- Fully additive. No existing field, section, or model changed. Bundles without a `behavior` key continue to load identically. `^0.4.0` caret consumers resolve `0.4.1` automatically.
+
+---
+
 ## [0.4.0] - 2026-05-23 - BREAKING — `UiSection.pages` is now a Map (mcp_ui_dsl 1.3 spec alignment) + 0.3.3 staged changes folded in
 
 ### Changed (BREAKING) — `UiSection.pages` = `Map<String, PageDefinition>`
