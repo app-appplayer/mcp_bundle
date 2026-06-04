@@ -220,12 +220,24 @@ void main() {
       expect(req.effectivePrompt, 'hello world');
     });
 
-    test('effectivePrompt - from messages (finds first user message)', () {
+    test('effectivePrompt - from messages (single user turn)', () {
       final req = LlmRequest.conversation([
         LlmMessage.system('system-msg'),
         LlmMessage.user('the question'),
       ]);
       expect(req.effectivePrompt, 'the question');
+    });
+
+    test('effectivePrompt - multi-turn returns the LATEST user message', () {
+      // Regression: must be the last user turn, not the first. Using the
+      // first dropped the latest turn and replayed the opening question
+      // (multi-turn chat answered every turn with turn-1's answer).
+      final req = LlmRequest.conversation([
+        LlmMessage.user('Capital of Spain? one word.'),
+        LlmMessage.assistant('Madrid'),
+        LlmMessage.user('What is 7 plus 3?'),
+      ]);
+      expect(req.effectivePrompt, 'What is 7 plus 3?');
     });
 
     test('effectivePrompt - from messages (falls back to first message)', () {

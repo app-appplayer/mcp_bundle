@@ -240,12 +240,19 @@ class LlmRequest {
     return [LlmMessage.user(prompt!)];
   }
 
-  /// Get effective prompt (first user message content if using messages).
+  /// Get effective prompt — the **latest** user message content when
+  /// using [messages].
+  ///
+  /// Must be the *last* user message, not the first: in a multi-turn
+  /// `messages` list the current question is the trailing user turn, and
+  /// the history adapter keeps every message *except* that last user one
+  /// as history. Using the first user message instead drops the latest
+  /// turn entirely and replays the opening question.
   String get effectivePrompt {
     if (prompt != null) return prompt!;
-    final userMsg = messages!.firstWhere(
+    final userMsg = messages!.lastWhere(
       (m) => m.role == 'user',
-      orElse: () => messages!.first,
+      orElse: () => messages!.last,
     );
     return userMsg.content;
   }

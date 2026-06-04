@@ -1,3 +1,26 @@
+## [0.4.2] - 2026-06-04 - LlmRequest.effectivePrompt multi-turn fix
+
+### Fixed
+- `LlmRequest.effectivePrompt` now returns the **latest** user message
+  (`lastWhere`) instead of the first (`firstWhere`) when the request
+  carries a `messages` list and no explicit `prompt`. The first-user form
+  was inconsistent with how callers derive history (the trailing user
+  message is removed and the rest kept as history) — using the first user
+  message dropped the latest turn entirely and replayed the opening
+  question, breaking every multi-turn agent conversation routed through
+  the LLM port adapters. Single-turn requests are unaffected
+  (`first == last`).
+
+### Backward compatibility
+- Behavior change for multi-turn `messages` requests only. Any consumer
+  relying on the previous first-user behavior (none known — it was a bug)
+  would see the latest user turn instead. Two tests that codified the old
+  behavior were corrected; a multi-turn regression test was added.
+- Patch-level fix. `^0.4.0` caret consumers pick up `0.4.2` automatically;
+  no downstream pubspec changes needed.
+
+---
+
 ## [0.4.1] - 2026-05-30 - Behavior section schema (additive)
 
 ### Added

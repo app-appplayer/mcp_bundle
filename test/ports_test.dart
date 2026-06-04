@@ -69,7 +69,9 @@ void main() {
         LlmMessage.user('How are you?'),
       ]);
       expect(req.messages?.length, equals(3));
-      expect(req.effectivePrompt, equals('Hello'));
+      // effectivePrompt = the LATEST user message (current question),
+      // not the first — else multi-turn replays the opening turn.
+      expect(req.effectivePrompt, equals('How are you?'));
       expect(req.effectiveMessages.length, equals(3));
     });
 
