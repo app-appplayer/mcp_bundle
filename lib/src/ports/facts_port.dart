@@ -64,6 +64,40 @@ class FactRecord {
     this.evidenceRefs = const [],
     required this.createdAt,
   });
+
+  /// Reconstruct from [toJson].
+  factory FactRecord.fromJson(Map<String, dynamic> json) => FactRecord(
+        id: json['id'] as String,
+        workspaceId: json['workspaceId'] as String,
+        type: json['type'] as String,
+        entityId: json['entityId'] as String?,
+        content: (json['content'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+        confidence: (json['confidence'] as num?)?.toDouble(),
+        period: json['period'] == null
+            ? null
+            : Period.fromJson((json['period'] as Map).cast<String, dynamic>()),
+        evidenceRefs:
+            (json['evidenceRefs'] as List?)?.cast<String>() ?? const <String>[],
+        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+
+  /// JSON form so a `FactRecord` round-trips through persistent
+  /// `KvStoragePort` adapters (e.g. agent fork storage). Brings `FactRecord`
+  /// in line with the peer section models (`SkillModule` /
+  /// `ProfileDefinition` / `Philosophy`), which already serialize.
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'workspaceId': workspaceId,
+        'type': type,
+        if (entityId != null) 'entityId': entityId,
+        'content': content,
+        if (confidence != null) 'confidence': confidence,
+        if (period != null) 'period': period!.toJson(),
+        'evidenceRefs': evidenceRefs,
+        'createdAt': createdAt.toIso8601String(),
+      };
 }
 
 /// Query descriptor for [FactsPort.queryFacts].

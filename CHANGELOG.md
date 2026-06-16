@@ -1,3 +1,8 @@
+## [0.4.3] - 2026-06-14 - FactRecord serialization
+
+### Added
+- `FactRecord.toJson()` / `FactRecord.fromJson()` — so a `FactRecord` round-trips through persistent `KvStoragePort` adapters (the encode-fallback path domain objects rely on). `FactRecord` was the **only** fork-axis payload type lacking serialization (`SkillModule` / `ProfileDefinition` / `Philosophy` already had it); when an agent's assigned facts were persisted via fork storage they serialized to `"Instance of 'FactRecord'"` (toString) and were lost on read. Additive — no API change for existing consumers; consumers persisting `FactRecord` via generic KV should floor to this version. Test: `test/fact_record_json_test.dart`.
+
 ## [0.4.2] - 2026-06-04 - LlmRequest.effectivePrompt multi-turn fix
 
 ### Fixed
