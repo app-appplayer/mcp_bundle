@@ -1,3 +1,11 @@
+## [0.4.4] - 2026-06-23 - Ethos fromJson field-named validation + Prohibition.forbiddenPatterns
+
+### Added
+- **`Prohibition.forbiddenPatterns` (`List<String>`, optional, default empty)** — literal patterns whose case-insensitive presence in a proposed output/action deterministically marks the prohibition violated. The `statement` is NL prose that a headless rule engine cannot soundly judge (semantic match needs an LLM — a host seam); `forbiddenPatterns` is the deterministic, LLM-free enforcement hook an author / LLM declares (banned term, secret marker, command, …). Additive: round-trips via `toJson`/`fromJson`, absent → empty (existing ethos unaffected). The structural prohibition evaluator (mcp_philosophy ≥ 0.1.2) matches these; without them it falls back to its built-in heuristics. Tests: `test/ethos_fromjson_validation_test.dart`.
+
+### Changed
+- **Ethos object-graph `fromJson` now fails loud with field-named errors.** `Ethos` / `ValuePriority` / `Prohibition` / `ProhibitionException` / `JudgmentCriterion` / `DirectionalAttitude` / `EthosMetadata` / `EthosScope` previously used bare `as String` / `as List` / `DateTime.parse(... as String)` casts on required fields, so a missing field surfaced as an opaque `type 'Null' is not a subtype of type 'String'` with no hint which field. They now throw `FormatException("<owner>.fromJson: missing or invalid required <type> field '<name>'")`. This is the parse boundary for host/LLM-authored ethos (via `bk.philosophy.put`); invalid input is now diagnosable. Valid ethos round-trips unchanged. `EthosRecord.fromJson` keeps its intentional read-tolerance (stored-record recovery) — only the inner Ethos graph is strict. Additive (no API/shape change); only the error *message* on already-invalid input changes. Test: `test/ethos_fromjson_validation_test.dart`.
+
 ## [0.4.3] - 2026-06-14 - FactRecord serialization
 
 ### Added

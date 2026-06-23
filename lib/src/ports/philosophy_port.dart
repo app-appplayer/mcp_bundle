@@ -11,6 +11,71 @@ library;
 import 'package:meta/meta.dart';
 
 // =============================================================================
+// fromJson validation helpers (loud, field-named)
+// =============================================================================
+// The Ethos object graph is authored by hosts / LLMs (`bk.philosophy.put`),
+// so a missing or mistyped field must surface as a clear, field-named
+// `<owner>.fromJson: ...` error instead of an opaque
+// `type 'Null' is not a subtype of type 'String'`. These replace the bare
+// `as String` / `as List` / `as Map` / `DateTime.parse(... as String)` casts
+// in the Ethos graph fromJson factories.
+
+String _reqStr(Map<String, dynamic> j, String field, String owner) {
+  final v = j[field];
+  if (v is String) return v;
+  throw FormatException(
+    "$owner.fromJson: missing or invalid required String field '$field'"
+    "${v == null ? '' : ' (got ${v.runtimeType})'}",
+  );
+}
+
+int _reqInt(Map<String, dynamic> j, String field, String owner) {
+  final v = j[field];
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  throw FormatException(
+    "$owner.fromJson: missing or invalid required int field '$field'"
+    "${v == null ? '' : ' (got ${v.runtimeType})'}",
+  );
+}
+
+List<R> _reqList<R>(
+  Map<String, dynamic> j,
+  String field,
+  String owner,
+  R Function(dynamic) parse,
+) {
+  final v = j[field];
+  if (v is List) return v.map(parse).toList();
+  throw FormatException(
+    "$owner.fromJson: missing or invalid required List field '$field'"
+    "${v == null ? '' : ' (got ${v.runtimeType})'}",
+  );
+}
+
+Map<String, dynamic> _reqMap(
+    Map<String, dynamic> j, String field, String owner) {
+  final v = j[field];
+  if (v is Map) return Map<String, dynamic>.from(v);
+  throw FormatException(
+    "$owner.fromJson: missing or invalid required Map field '$field'"
+    "${v == null ? '' : ' (got ${v.runtimeType})'}",
+  );
+}
+
+DateTime _reqDate(Map<String, dynamic> j, String field, String owner) {
+  final v = j[field];
+  if (v is String) {
+    final d = DateTime.tryParse(v);
+    if (d != null) return d;
+  }
+  throw FormatException(
+    "$owner.fromJson: missing or invalid required ISO-8601 date field '$field'"
+    "${v == null ? '' : ' (got ${v.runtimeType})'}",
+  );
+}
+
+// =============================================================================
 // PhilosophyPort
 // =============================================================================
 
@@ -158,14 +223,12 @@ class Ethos {
   /// Create from JSON.
   factory Ethos.fromJson(Map<String, dynamic> json) {
     return Ethos(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      valuePriorities: (json['valuePriorities'] as List<dynamic>)
-          .map((e) => ValuePriority.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      prohibitions: (json['prohibitions'] as List<dynamic>)
-          .map((e) => Prohibition.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      id: _reqStr(json, 'id', 'Ethos'),
+      name: _reqStr(json, 'name', 'Ethos'),
+      valuePriorities: _reqList(json, 'valuePriorities', 'Ethos',
+          (e) => ValuePriority.fromJson(e as Map<String, dynamic>)),
+      prohibitions: _reqList(json, 'prohibitions', 'Ethos',
+          (e) => Prohibition.fromJson(e as Map<String, dynamic>)),
       judgmentCriteria: (json['judgmentCriteria'] as List<dynamic>?)
               ?.map((e) => JudgmentCriterion.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -175,8 +238,7 @@ class Ethos {
                   (e) => DirectionalAttitude.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      metadata:
-          EthosMetadata.fromJson(json['metadata'] as Map<String, dynamic>),
+      metadata: EthosMetadata.fromJson(_reqMap(json, 'metadata', 'Ethos')),
       scopes: (json['scopes'] as List<dynamic>?)
           ?.map((e) => EthosScope.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -233,11 +295,11 @@ class ValuePriority {
 
   factory ValuePriority.fromJson(Map<String, dynamic> json) {
     return ValuePriority(
-      id: json['id'] as String,
-      rank: json['rank'] as int,
-      higherValue: json['higherValue'] as String,
-      lowerValue: json['lowerValue'] as String,
-      rationale: json['rationale'] as String,
+      id: _reqStr(json, 'id', 'ValuePriority'),
+      rank: _reqInt(json, 'rank', 'ValuePriority'),
+      higherValue: _reqStr(json, 'higherValue', 'ValuePriority'),
+      lowerValue: _reqStr(json, 'lowerValue', 'ValuePriority'),
+      rationale: _reqStr(json, 'rationale', 'ValuePriority'),
       conditions: (json['conditions'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
@@ -263,12 +325,26 @@ class Prohibition {
   /// Explicit exceptions to this prohibition.
   final List<ProhibitionException>? exceptions;
 
+  /// Literal patterns whose case-insensitive presence in a proposed
+  /// output/action **deterministically** marks this prohibition violated.
+  ///
+  /// The `statement` is natural-language prose; a headless rule engine
+  /// cannot soundly judge semantic violation of arbitrary prose (that needs
+  /// an LLM — a host seam). `forbiddenPatterns` is the deterministic,
+  /// LLM-free enforcement hook: an author / LLM declares the concrete strings
+  /// that must never appear (a banned term, secret marker, command, etc.).
+  /// Empty (default) = no deterministic match; the structural evaluator falls
+  /// back to its built-in heuristics, and semantic judgment is deferred to an
+  /// LLM seam.
+  final List<String> forbiddenPatterns;
+
   const Prohibition({
     required this.id,
     required this.statement,
     required this.severity,
     required this.rationale,
     this.exceptions,
+    this.forbiddenPatterns = const [],
   });
 
   /// Whether this prohibition has explicit exceptions.
@@ -285,18 +361,24 @@ class Prohibition {
       'rationale': rationale,
       if (exceptions != null)
         'exceptions': exceptions!.map((e) => e.toJson()).toList(),
+      if (forbiddenPatterns.isNotEmpty) 'forbiddenPatterns': forbiddenPatterns,
     };
   }
 
   factory Prohibition.fromJson(Map<String, dynamic> json) {
     return Prohibition(
-      id: json['id'] as String,
-      statement: json['statement'] as String,
-      severity: ProhibitionSeverity.fromString(json['severity'] as String),
-      rationale: json['rationale'] as String,
+      id: _reqStr(json, 'id', 'Prohibition'),
+      statement: _reqStr(json, 'statement', 'Prohibition'),
+      severity: ProhibitionSeverity.fromString(
+          _reqStr(json, 'severity', 'Prohibition')),
+      rationale: _reqStr(json, 'rationale', 'Prohibition'),
       exceptions: (json['exceptions'] as List<dynamic>?)
           ?.map((e) => ProhibitionException.fromJson(e as Map<String, dynamic>))
           .toList(),
+      forbiddenPatterns: (json['forbiddenPatterns'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
   }
 }
@@ -324,8 +406,9 @@ class ProhibitionException {
 
   factory ProhibitionException.fromJson(Map<String, dynamic> json) {
     return ProhibitionException(
-      condition: json['condition'] as String,
-      justificationRequired: json['justificationRequired'] as String,
+      condition: _reqStr(json, 'condition', 'ProhibitionException'),
+      justificationRequired:
+          _reqStr(json, 'justificationRequired', 'ProhibitionException'),
     );
   }
 }
@@ -374,11 +457,10 @@ class JudgmentCriterion {
 
   factory JudgmentCriterion.fromJson(Map<String, dynamic> json) {
     return JudgmentCriterion(
-      id: json['id'] as String,
-      conditions: (json['conditions'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
-      preferredAction: json['preferredAction'] as String,
+      id: _reqStr(json, 'id', 'JudgmentCriterion'),
+      conditions: _reqList(
+          json, 'conditions', 'JudgmentCriterion', (e) => e as String),
+      preferredAction: _reqStr(json, 'preferredAction', 'JudgmentCriterion'),
       requiredValidation: json['requiredValidation'] as String?,
       fallbackStrategy: json['fallbackStrategy'] as String?,
     );
@@ -418,12 +500,12 @@ class DirectionalAttitude {
 
   factory DirectionalAttitude.fromJson(Map<String, dynamic> json) {
     return DirectionalAttitude(
-      id: json['id'] as String,
-      domain: AttitudeDomain.fromString(json['domain'] as String),
-      posture: json['posture'] as String,
-      behavioralImplications: (json['behavioralImplications'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
+      id: _reqStr(json, 'id', 'DirectionalAttitude'),
+      domain: AttitudeDomain.fromString(
+          _reqStr(json, 'domain', 'DirectionalAttitude')),
+      posture: _reqStr(json, 'posture', 'DirectionalAttitude'),
+      behavioralImplications: _reqList(json, 'behavioralImplications',
+          'DirectionalAttitude', (e) => e as String),
     );
   }
 }
@@ -471,10 +553,10 @@ class EthosMetadata {
 
   factory EthosMetadata.fromJson(Map<String, dynamic> json) {
     return EthosMetadata(
-      version: json['version'] as String,
+      version: _reqStr(json, 'version', 'EthosMetadata'),
       author: json['author'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: _reqDate(json, 'createdAt', 'EthosMetadata'),
+      updatedAt: _reqDate(json, 'updatedAt', 'EthosMetadata'),
       context: json['context'] as String?,
       tags: (json['tags'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -512,7 +594,7 @@ class EthosScope {
 
   factory EthosScope.fromJson(Map<String, dynamic> json) {
     return EthosScope(
-      domain: json['domain'] as String,
+      domain: _reqStr(json, 'domain', 'EthosScope'),
       description: json['description'] as String?,
       tags: (json['tags'] as List<dynamic>?)
           ?.map((e) => e as String)
