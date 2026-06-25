@@ -1,3 +1,12 @@
+## [0.4.5] - 2026-06-25 - Datastore port contracts (additive)
+
+### Added
+- `datastore_port.dart` — the data-interface port contracts: `DatasourceAdapter`
+  base + `FsAdapter` (`fs.*`) / `DbAdapter` (`db.*`) family contracts, plus the
+  `FsEntry` / `FsStat` / `DbRow` / `DbStatement` DTOs and `DatastoreException`.
+  Exported from the `ports.dart` catalogue. Implementations live in the
+  datastore capability packages. Purely additive — no existing contract changed.
+
 ## [0.4.4] - 2026-06-23 - Ethos fromJson field-named validation + Prohibition.forbiddenPatterns
 
 ### Added
