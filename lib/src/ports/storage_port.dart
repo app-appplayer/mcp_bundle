@@ -39,7 +39,16 @@ abstract class KvStoragePort {
   /// Check if key exists.
   Future<bool> exists(String key);
 
-  /// List keys with optional prefix.
+  /// List keys, optionally filtered by [prefix].
+  ///
+  /// [prefix] is a **string prefix** matched per key with `String.startsWith`,
+  /// NOT a directory / path segment: a key is included iff
+  /// `key.startsWith(prefix)` (all keys when [prefix] is null or empty).
+  /// Implementations backed by a hierarchical store (e.g. a file tree) must
+  /// reconstruct full keys and filter by string prefix — they must NOT scope
+  /// the scan to a `<root>/<prefix>/` directory, which silently drops flat
+  /// namespaced keys (e.g. `philosophy.ethos:<id>`) and partial-segment
+  /// prefixes. The in-memory reference implementation defines this contract.
   Future<List<String>> keys({String? prefix});
 
   /// Clear all data.

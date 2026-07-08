@@ -106,5 +106,67 @@ void main() {
         isTrue,
       );
     });
+
+    test('EthosStorePort has no deleteEthos — capability is separate', () {
+      // StubEthosStorePort implements only EthosStorePort; deletion is opt-in.
+      expect(port, isNot(isA<EthosStoreDelete>()));
+    });
   });
+
+  group('EthosStoreDelete (optional capability)', () {
+    test('detected via type check; idempotent + clears active', () async {
+      final store = _MemEthosStore();
+      // Not the plain stub — a delete-capable adapter opts into the interface.
+      expect(store, isA<EthosStoreDelete>());
+      expect(store, isA<EthosStorePort>());
+
+      final rec = EthosRecord(
+        id: 'e1',
+        name: 'Care',
+        version: '1.0',
+        payload: const {},
+        createdAt: DateTime(2026, 1, 1),
+      );
+      await store.putEthos(rec);
+      await store.activateEthos('e1');
+      expect(await store.getActiveEthosId(), 'e1');
+
+      await store.deleteEthos('e1');
+      expect(await store.getEthos('e1'), isNull);
+      // Deleting the active id clears the active pointer.
+      expect(await store.getActiveEthosId(), isNull);
+
+      // Idempotent — deleting an absent id does not throw.
+      await store.deleteEthos('e1');
+    });
+  });
+}
+
+/// Minimal delete-capable ethos store — mirrors the KvEthosStoreAdapter
+/// contract (`mcp_philosophy`) at the port level.
+class _MemEthosStore implements EthosStorePort, EthosStoreDelete {
+  final Map<String, EthosRecord> _records = <String, EthosRecord>{};
+  String? _activeId;
+
+  @override
+  Future<EthosRecord?> getEthos(String id) async => _records[id];
+
+  @override
+  Future<void> putEthos(EthosRecord ethos) async => _records[ethos.id] = ethos;
+
+  @override
+  Future<List<EthosRecord>> listEthos({int? limit}) async =>
+      _records.values.toList();
+
+  @override
+  Future<void> activateEthos(String id) async => _activeId = id;
+
+  @override
+  Future<String?> getActiveEthosId() async => _activeId;
+
+  @override
+  Future<void> deleteEthos(String id) async {
+    _records.remove(id);
+    if (_activeId == id) _activeId = null;
+  }
 }

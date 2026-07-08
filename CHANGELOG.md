@@ -1,3 +1,13 @@
+## [0.4.6] - 2026-07-09 - EthosStoreDelete capability interface + KvStoragePort.keys(prefix:) doc
+
+### Added
+- **`EthosStoreDelete`** — a new, **separate** optional-deletion capability interface: `Future<void> deleteEthos(String id)` (idempotent — no-op if absent; clears the active pointer when the deleted id was active). Consumers detect support with `store is EthosStoreDelete`. Enables ops workspace `purge` to clear a deleted org's charter ethos, which previously orphaned in the store.
+- Kept **out of `EthosStorePort`** deliberately. Adding a member to `EthosStorePort` would be **breaking** for every implementer — Dart `implements` requires each interface member even with a default body (verified) — and because `EthosStorePort` is re-exported by `mcp_philosophy` / `mcp_knowledge` / `flowbrain`, that break would cascade a republish through most of the package graph (`mcp_io`, `mcp_channel`, …) and everything Studio consumes. A separate interface is **additive**: `EthosStorePort`'s contract is untouched, nothing existing breaks, only opt-in adapters implement it (see `mcp_philosophy` `KvEthosStoreAdapter`).
+- **DEFERRED-BREAKING (recorded):** when the next genuinely-breaking `mcp_bundle` change is batched, `deleteEthos` may be folded into `EthosStorePort` as a required member and this capability interface retired — paying the re-export cascade once.
+
+### Changed
+- `KvStoragePort.keys({prefix})` dartdoc clarified: `prefix` is a string prefix (`startsWith`), not a directory path. Doc-only — no API/behavior change. (Folded in from the earlier prepared-but-unpublished 0.4.6 doc bump; both changes ship as this single 0.4.6.)
+
 ## [0.4.5] - 2026-06-25 - Datastore port contracts (additive)
 
 ### Added

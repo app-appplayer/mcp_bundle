@@ -25,6 +25,35 @@ abstract class EthosStorePort {
   Future<String?> getActiveEthosId();
 }
 
+/// Optional deletion capability for ethos stores.
+///
+/// Kept **separate** from [EthosStorePort] on purpose. Adding `deleteEthos` to
+/// [EthosStorePort] itself would be a breaking change for every implementer
+/// (Dart `implements` requires each interface member even when a default body
+/// is provided), and — because [EthosStorePort] is re-exported by
+/// `mcp_philosophy` / `mcp_knowledge` / `flowbrain` — that break would cascade a
+/// republish through most of the package graph (`mcp_io`, `mcp_channel`, …) and
+/// everything Studio consumes. A separate capability interface is additive:
+/// [EthosStorePort]'s contract is untouched, so nothing existing breaks, and
+/// only adapters that actually support deletion opt in.
+///
+/// Consumers detect support with `store is EthosStoreDelete`:
+/// ```dart
+/// final store = ...; // EthosStorePort
+/// if (store is EthosStoreDelete) await store.deleteEthos(id);
+/// ```
+///
+/// DEFERRED-BREAKING (recorded): when the next genuinely-breaking `mcp_bundle`
+/// change is batched, `deleteEthos` may be folded into [EthosStorePort] as a
+/// required member and this capability interface retired — paying the re-export
+/// cascade once. Until then it stays a separate, additive capability.
+abstract interface class EthosStoreDelete {
+  /// Delete an ethos record by ID. Idempotent — deleting an absent id is a
+  /// no-op (does not throw). If the deleted id was the active ethos, the active
+  /// pointer is cleared (`getActiveEthosId` → null afterward).
+  Future<void> deleteEthos(String id);
+}
+
 /// Canonical ethos record.
 class EthosRecord {
   /// Ethos identifier.
