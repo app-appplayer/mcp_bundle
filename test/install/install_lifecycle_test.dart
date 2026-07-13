@@ -399,6 +399,44 @@ void main() {
     });
   });
 
+  group('installFile (.mcpb file source)', () {
+    test('installs a .mcpb file', () async {
+      final mbd = await Directory('${tempRoot.path}/mbd').create();
+      await _writeSampleMbd(mbd);
+      final bytes = await McpBundlePacker.packDirectory(mbd.path);
+      final mcpb = File('${tempRoot.path}/app.mcpb');
+      await mcpb.writeAsBytes(bytes);
+
+      final installed = await McpBundleInstaller.installFile(
+        mcpb.path,
+        installRoot: '${tempRoot.path}/installs',
+        runtime: const RuntimeDescriptor(version: '1.0.0'),
+      );
+      expect(installed.id, 'com.example.app');
+    });
+
+    test(
+        'REJECTS a wrongly-named archive (extension enforced — a lenient '
+        'installer masks a producer handing the wrong artifact form)',
+        () async {
+      final mbd = await Directory('${tempRoot.path}/mbd').create();
+      await _writeSampleMbd(mbd);
+      final bytes = await McpBundlePacker.packDirectory(mbd.path);
+      // Valid .mcpb bytes under a `.mbd` name — the marketplace temp-file case.
+      final wrongName = File('${tempRoot.path}/app.mbd');
+      await wrongName.writeAsBytes(bytes);
+
+      expect(
+        () => McpBundleInstaller.installFile(
+          wrongName.path,
+          installRoot: '${tempRoot.path}/installs',
+          runtime: const RuntimeDescriptor(version: '1.0.0'),
+        ),
+        throwsA(isA<BundleReadException>()),
+      );
+    });
+  });
+
   group('installUrl (HTTP source)', () {
     test('downloads bytes and installs', () async {
       final mbd = await Directory('${tempRoot.path}/mbd').create();

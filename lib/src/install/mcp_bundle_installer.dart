@@ -76,6 +76,13 @@ class McpBundleInstaller {
   }
 
   /// Install from a `.mcpb` file path.
+  ///
+  /// The extension is ENFORCED: `.mcpb` is the packed install archive and the
+  /// only file form this installer accepts (an unpacked `.mbd/` directory goes
+  /// through [installDirectory]). Content-sniffing a wrongly-named file is
+  /// deliberately rejected — a lenient installer masks a producer handing the
+  /// wrong artifact form, and the defect then surfaces only on stricter hosts
+  /// (the marketplace temp-file case, spec 08 §4 "Standard Consumer Embed").
   static Future<InstalledBundle> installFile(
     String filePath, {
     required String installRoot,
@@ -83,6 +90,13 @@ class McpBundleInstaller {
     InstallPolicy policy = const InstallPolicy(),
     TrustStore trustStore = const EmptyTrustStore(),
   }) async {
+    if (!filePath.toLowerCase().endsWith('.mcpb')) {
+      throw BundleReadException(
+        'Expected a `.mcpb` package file — got "$filePath". '
+        'An unpacked `.mbd/` directory installs via installDirectory.',
+        uri: Uri.file(filePath),
+      );
+    }
     final file = File(filePath);
     if (!await file.exists()) {
       throw BundleNotFoundException(Uri.file(filePath));

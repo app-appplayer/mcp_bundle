@@ -82,6 +82,11 @@ class ToolsSection {
 /// - [cloud] — external HTTPS endpoint. `target` carries `{url}`.
 /// - [js] — JavaScript shipped inside the bundle. `target` carries
 ///   `{entry, fn}` (entry = file path under bundle, fn = function name).
+/// - [ts] — compiled real-code tool (TypeScript source shipped inside the
+///   bundle; `target` carries `{entry, fn}` like [js]). Executed SERVER-side
+///   by a serving runtime built from the bundle (a `BundleType.server`
+///   bundle) — hosts have no executor for it and treat the entry as a
+///   declaration (spec 08 §5).
 /// - [unknown] — kind value not recognized at parse time. Hosts may
 ///   choose to surface or skip; validator flags unknown kinds.
 enum ToolKind {
@@ -89,6 +94,7 @@ enum ToolKind {
   mcp,
   cloud,
   js,
+  ts,
   unknown;
 
   /// Parse a string to [ToolKind], returning [ToolKind.unknown] when
@@ -104,6 +110,8 @@ enum ToolKind {
         return ToolKind.cloud;
       case 'js':
         return ToolKind.js;
+      case 'ts':
+        return ToolKind.ts;
       default:
         return ToolKind.unknown;
     }
@@ -121,6 +129,8 @@ enum ToolKind {
         return 'cloud';
       case ToolKind.js:
         return 'js';
+      case ToolKind.ts:
+        return 'ts';
       case ToolKind.unknown:
         return 'unknown';
     }

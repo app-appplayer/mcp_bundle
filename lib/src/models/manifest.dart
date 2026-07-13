@@ -286,6 +286,12 @@ enum BundleType {
   /// Extension bundle.
   extension,
 
+  /// Served as a live MCP server rather than installed (MCP Serving —
+  /// "server = serves UI + manifest + tools + knowledge", platform spec 00).
+  /// Not an install target: consumers reach it via `connectServer`. Its
+  /// `kind: ts` tools are compiled and executed by the serving runtime.
+  server,
+
   /// Unknown type.
   unknown;
 

@@ -1,3 +1,17 @@
+## [0.4.7] - 2026-07-13 - installFile .mcpb enforcement + server type / ts tool kind
+
+### Added
+- `BundleType.server` — a bundle served as a live MCP server rather than
+  installed (MCP Serving); consumers reach it via `connectServer`.
+- `ToolKind.ts` — compiled real-code tool (`target: {entry, fn}`), built and
+  executed by the serving runtime; hosts treat it as declaration-only.
+  Previously both values normalized to `unknown` through the canonical packer.
+
+### Changed
+- `McpBundleInstaller.installFile` now accepts `.mcpb` only, to reject
+  mislabeled archives (`BundleReadException`). `.mbd/` directories:
+  `installDirectory`, unchanged.
+
 ## [0.4.6] - 2026-07-09 - EthosStoreDelete capability interface + KvStoragePort.keys(prefix:) doc
 
 ### Added
