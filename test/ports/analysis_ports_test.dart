@@ -9,11 +9,12 @@ void main() {
     // ---- Enums -------------------------------------------------------------
     group('AnalysisSourceType', () {
       test('has all expected values', () {
-        expect(AnalysisSourceType.values.length, equals(4));
+        expect(AnalysisSourceType.values.length, equals(5));
         expect(
           AnalysisSourceType.values,
           containsAll([
             AnalysisSourceType.factgraph,
+            AnalysisSourceType.synthetic,
             AnalysisSourceType.mcpIo,
             AnalysisSourceType.external,
             AnalysisSourceType.upload,

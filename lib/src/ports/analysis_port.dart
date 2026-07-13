@@ -21,7 +21,12 @@ enum AnalysisSourceType {
   external,
 
   /// Data uploaded directly.
-  upload;
+  upload,
+
+  /// Synthetically generated data (simulation / Monte Carlo) — a generator
+  /// registered as a data source so synthetic data flows the same pipeline
+  /// as measured data (analysis · alerts · artifacts · provenance).
+  synthetic;
 
   /// Parse from string with safe default.
   static AnalysisSourceType fromString(String value) {

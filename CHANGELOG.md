@@ -1,3 +1,10 @@
+## [0.4.8] - 2026-07-14 - AnalysisSourceType.synthetic
+
+### Added
+- `AnalysisSourceType.synthetic` — simulation/Monte-Carlo generators register
+  as data sources, so synthetic data flows the same analysis pipeline as
+  measured data.
+
 ## [0.4.7] - 2026-07-13 - installFile .mcpb enforcement + server type / ts tool kind
 
 ### Added

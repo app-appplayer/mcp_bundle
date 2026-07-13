@@ -21,6 +21,15 @@ void main() {
     expect(ToolKind.fromString('nonsense'), ToolKind.unknown);
   });
 
+  test('AnalysisSourceType.synthetic round-trips (simulation source)', () {
+    expect(AnalysisSourceType.fromString('synthetic'),
+        AnalysisSourceType.synthetic);
+    expect(AnalysisSourceType.synthetic.name, 'synthetic');
+    // Unknown still falls back safely.
+    expect(AnalysisSourceType.fromString('nope'),
+        AnalysisSourceType.factgraph);
+  });
+
   test('manifest with type server + kind ts survives model round-trip',
       () {
     final manifest = BundleManifest.fromJson(const {
