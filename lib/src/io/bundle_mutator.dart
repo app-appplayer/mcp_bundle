@@ -112,17 +112,23 @@ class McpBundleMutator {
     McpLoaderOptions? options,
   }) async {
     final dir = Directory(mbdPath);
-    if (!await dir.exists()) {
-      throw BundleMutationException(
-        'Bundle directory does not exist: $mbdPath',
-        uri: Uri.directory(dir.absolute.path),
-        reason: BundleMutationReason.lockFailed,
-      );
-    }
     final absPath = dir.absolute.path;
 
+    // The mutex must be joined before the first `await`. `protect` takes
+    // its queue position synchronously, so anything awaited ahead of it
+    // — a directory probe included — lets two callers arrive in the
+    // opposite order to the one they were issued in, and the FIFO
+    // guarantee silently stops holding. The existence check therefore
+    // runs inside the protected body.
     final mutex = _MutexRegistry.get(absPath);
     return mutex.protect<R>(timeout, () async {
+      if (!await dir.exists()) {
+        throw BundleMutationException(
+          'Bundle directory does not exist: $mbdPath',
+          uri: Uri.directory(absPath),
+          reason: BundleMutationReason.lockFailed,
+        );
+      }
       RandomAccessFile? lockHandle;
       if (useFileLock) {
         lockHandle = await _acquireFileLock(absPath);

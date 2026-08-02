@@ -11,6 +11,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'bundle_file_store.dart';
 import '../models/agent_section.dart';
 import '../models/asset.dart';
 import '../models/binding.dart';
@@ -333,6 +334,27 @@ class McpBundleLoader {
       throw BundleNotFoundException(Uri.directory(target.path));
     }
     return loadDirectory(target.path, options: options);
+  }
+
+  /// Load a bundle whose files live in [store].
+  ///
+  /// The store-shaped counterpart to [loadDirectory]: same `manifest.json`
+  /// at the bundle root, same parse path, no filesystem assumption.
+  ///
+  /// Asset `contentRef`s are deliberately left relative. [loadDirectory]
+  /// rewrites them to absolute paths because a consumer holding only the
+  /// asset can still open it with `dart:io`; here there is no such path
+  /// to rewrite to, and the store already resolves bundle-relative names.
+  static Future<McpBundle> loadStore(
+    BundleFileStore store, {
+    McpLoaderOptions? options,
+  }) async {
+    final manifest = await store.read('manifest.json');
+    if (manifest == null) {
+      throw BundleLoadException('manifest.json not found in bundle store');
+    }
+    final bundle = fromJsonString(utf8.decode(manifest), options: options);
+    return bundle.copyWith(store: store);
   }
 
   // ==================== Phase 1: Schema Version ====================

@@ -12,10 +12,12 @@ import 'package:http/http.dart' as http;
 
 import '../../mcp_bundle.dart'
     show McpBundle, BundleManifest, BundleType;
+import '../io/bundle_file_store.dart';
 import '../io/exceptions.dart';
 import '../models/integrity.dart' as schema;
 import '../utils/canonicalization.dart';
 import '../utils/integrity.dart' as hash;
+import 'bundle_install_store.dart';
 import 'install_policy.dart';
 import 'installed_bundle.dart';
 import 'mcp_bundle_packer.dart';
@@ -26,21 +28,37 @@ import 'trust_store.dart';
 class McpBundleInstaller {
   static const _sidecar = '.install.json';
   static const _registrySchema = '1.0.0';
-  static const _stagingDir = '.staging';
-  static const _lockFile = '.lock';
   static const _bundleJsonEntry = 'manifest.json';
+
+  /// Resolve the destination from the two ways of naming one.
+  ///
+  /// [installRoot] stays because every existing caller passes it and a
+  /// filesystem host genuinely has a root; [store] is how a host that
+  /// cannot name a path says the same thing. Passing neither is a
+  /// programming error, not a runtime condition.
+  static BundleInstallStore _destination(
+    String? installRoot,
+    BundleInstallStore? store,
+  ) {
+    if (store != null) return store;
+    if (installRoot != null) return FileBundleInstallStore(installRoot);
+    throw ArgumentError(
+      'Provide either installRoot (filesystem) or store (any destination).',
+    );
+  }
 
   /// Install from raw `.mcpb` bytes.
   static Future<InstalledBundle> installBytes(
     Uint8List bytes, {
-    required String installRoot,
+    String? installRoot,
+    BundleInstallStore? store,
     required RuntimeDescriptor runtime,
     InstallPolicy policy = const InstallPolicy(),
     TrustStore trustStore = const EmptyTrustStore(),
   }) async {
     return _installInner(
       bytes: bytes,
-      installRoot: installRoot,
+      store: _destination(installRoot, store),
       runtime: runtime,
       policy: policy,
       trustStore: trustStore,
@@ -57,7 +75,8 @@ class McpBundleInstaller {
   /// `.mcpb` first.
   static Future<InstalledBundle> installDirectory(
     String mbdPath, {
-    required String installRoot,
+    String? installRoot,
+    BundleInstallStore? store,
     required RuntimeDescriptor runtime,
     InstallPolicy policy = const InstallPolicy(),
     TrustStore trustStore = const EmptyTrustStore(),
@@ -69,6 +88,7 @@ class McpBundleInstaller {
     return installBytes(
       bytes,
       installRoot: installRoot,
+      store: store,
       runtime: runtime,
       policy: policy,
       trustStore: trustStore,
@@ -85,7 +105,8 @@ class McpBundleInstaller {
   /// (the marketplace temp-file case, spec 08 §4 "Standard Consumer Embed").
   static Future<InstalledBundle> installFile(
     String filePath, {
-    required String installRoot,
+    String? installRoot,
+    BundleInstallStore? store,
     required RuntimeDescriptor runtime,
     InstallPolicy policy = const InstallPolicy(),
     TrustStore trustStore = const EmptyTrustStore(),
@@ -105,6 +126,7 @@ class McpBundleInstaller {
     return installBytes(
       bytes,
       installRoot: installRoot,
+      store: store,
       runtime: runtime,
       policy: policy,
       trustStore: trustStore,
@@ -122,7 +144,8 @@ class McpBundleInstaller {
   /// a one-shot client is created and closed inside this call.
   static Future<InstalledBundle> installUrl(
     Uri url, {
-    required String installRoot,
+    String? installRoot,
+    BundleInstallStore? store,
     required RuntimeDescriptor runtime,
     InstallPolicy policy = const InstallPolicy(),
     TrustStore trustStore = const EmptyTrustStore(),
@@ -169,6 +192,7 @@ class McpBundleInstaller {
       return installBytes(
         bytes,
         installRoot: installRoot,
+        store: store,
         runtime: runtime,
         policy: policy,
         trustStore: trustStore,
@@ -181,51 +205,47 @@ class McpBundleInstaller {
   }
 
   /// Remove an installed bundle by id.
-  static Future<void> uninstall(String installRoot, String id) async {
-    final root = await _ensureInstallRoot(installRoot);
-    final lock = await _acquireLock(root);
-    try {
-      final target = Directory(_join(root.path, id));
-      if (!await target.exists()) return;
-      final staging = Directory(
-        _join(root.path, _stagingDir, '${_uuid()}-deleted'),
-      );
-      await Directory(_join(root.path, _stagingDir)).create(recursive: true);
-      await target.rename(staging.path);
-      await staging.delete(recursive: true);
-    } finally {
-      await _releaseLock(lock);
-    }
+  static Future<void> uninstall(String installRoot, String id) =>
+      uninstallFrom(FileBundleInstallStore(installRoot), id);
+
+  /// Remove an installed bundle by id from [store].
+  static Future<void> uninstallFrom(BundleInstallStore store, String id) {
+    return store.withLock(() => store.remove(id));
   }
 
   /// Discover installed bundles by scanning the install root.
-  static Future<List<InstalledBundle>> list(String installRoot) async {
-    final root = Directory(installRoot);
-    if (!await root.exists()) return const [];
+  static Future<List<InstalledBundle>> list(String installRoot) =>
+      listFrom(FileBundleInstallStore(installRoot));
+
+  /// Discover installed bundles in [store].
+  ///
+  /// Best-effort per bundle: an entry that cannot be read is skipped
+  /// rather than failing the whole listing, because one corrupt install
+  /// must not hide every healthy one.
+  static Future<List<InstalledBundle>> listFrom(BundleInstallStore store) async {
     final out = <InstalledBundle>[];
-    await for (final entity in root.list(followLinks: false)) {
-      if (entity is! Directory) continue;
-      final name = _basename(entity.path);
-      if (name == _stagingDir || name.startsWith('.')) continue;
-      final bundleJson = File(_join(entity.path, _bundleJsonEntry));
-      if (!await bundleJson.exists()) continue;
+    for (final id in await store.listInstalled()) {
       try {
-        final json = jsonDecode(await bundleJson.readAsString())
-            as Map<String, dynamic>;
+        final files = await store.openInstalled(id);
+        if (files == null) continue;
+        final raw = await files.read(_bundleJsonEntry);
+        if (raw == null) continue;
+        final json = jsonDecode(utf8.decode(raw)) as Map<String, dynamic>;
         final manifest = BundleManifest.fromJson(
           json['manifest'] as Map<String, dynamic>? ?? <String, dynamic>{},
         );
-        final sidecar = await _readSidecar(entity.path);
+        final sidecar = await _readSidecar(files);
         out.add(InstalledBundle(
           id: manifest.id,
           version: manifest.version,
-          installPath: entity.absolute.path,
+          installPath: store.locatorOf(id),
           manifest: manifest,
           installedAt: sidecar?.installedAt ?? DateTime.now().toUtc(),
           signer: sidecar?.signer,
+          files: files,
         ));
       } catch (_) {
-        // Skip unreadable directories; list() is best-effort.
+        // Skip unreadable entries; listing is best-effort.
       }
     }
     return out;
@@ -235,7 +255,7 @@ class McpBundleInstaller {
 
   static Future<InstalledBundle> _installInner({
     required Uint8List bytes,
-    required String installRoot,
+    required BundleInstallStore store,
     required RuntimeDescriptor runtime,
     required InstallPolicy policy,
     required TrustStore trustStore,
@@ -268,10 +288,9 @@ class McpBundleInstaller {
     final bundle = McpBundle.fromJson(manifestJson);
     _enforceBundleShape(bundle);
 
-    final root = await _ensureInstallRoot(installRoot);
-    final lock = await _acquireLock(root);
-    try {
-      _enforceCompatibility(bundle, runtime, await list(installRoot));
+    return store.withLock(() async {
+      final installed = await listFrom(store);
+      _enforceCompatibility(bundle, runtime, installed);
       final signer = _enforceIntegrityAndSignatures(
         bundle: bundle,
         bytes: bytes,
@@ -280,14 +299,18 @@ class McpBundleInstaller {
         trustStore: trustStore,
       );
 
-      final existing = await _findExisting(root, bundle.manifest.id);
+      final id = bundle.manifest.id;
+      InstalledBundle? existing;
+      for (final b in installed) {
+        if (b.id == id) {
+          existing = b;
+          break;
+        }
+      }
       switch (policy.onConflict) {
         case InstallConflictPolicy.failIfExists:
           if (existing != null) {
-            throw BundleAlreadyInstalledException(
-              bundle.manifest.id,
-              existing.version,
-            );
+            throw BundleAlreadyInstalledException(id, existing.version);
           }
           break;
         case InstallConflictPolicy.skipIfExists:
@@ -297,60 +320,30 @@ class McpBundleInstaller {
           break;
       }
 
-      final stagingRoot = Directory(_join(root.path, _stagingDir));
-      await stagingRoot.create(recursive: true);
-      final stagingPath = _join(stagingRoot.path, _uuid());
-      final staging = Directory(stagingPath);
-      await staging.create();
-
+      final staging = await store.beginInstall(id);
       try {
-        await _extract(archive, staging, policy.limits);
+        await _extract(archive, staging.files, policy.limits);
         await _writeSidecar(
-          stagingPath,
+          staging.files,
           bundle: bundle,
           sourceBytes: bytes,
           signer: signer,
         );
-
-        final targetPath = _join(root.path, bundle.manifest.id);
-        final target = Directory(targetPath);
-        Directory? displaced;
-        if (await target.exists()) {
-          displaced = Directory(_join(
-            stagingRoot.path,
-            '${_uuid()}-previous',
-          ));
-          await target.rename(displaced.path);
-        }
-        try {
-          await staging.rename(targetPath);
-        } catch (e) {
-          if (displaced != null) {
-            await displaced.rename(targetPath);
-          }
-          rethrow;
-        }
-        if (displaced != null && await displaced.exists()) {
-          await displaced.delete(recursive: true);
-        }
-
+        final locator = await staging.promote();
         return InstalledBundle(
-          id: bundle.manifest.id,
+          id: id,
           version: bundle.manifest.version,
-          installPath: target.absolute.path,
+          installPath: locator,
           manifest: bundle.manifest,
           installedAt: DateTime.now().toUtc(),
           signer: signer,
+          files: await store.openInstalled(id),
         );
       } catch (_) {
-        if (await staging.exists()) {
-          await staging.delete(recursive: true);
-        }
+        await staging.abandon();
         rethrow;
       }
-    } finally {
-      await _releaseLock(lock);
-    }
+    });
   }
 
   // ── Validation helpers ───────────────────────────────────────────────
@@ -652,7 +645,7 @@ class McpBundleInstaller {
 
   static Future<void> _extract(
     Archive archive,
-    Directory target,
+    BundleFileStore target,
     InstallLimits limits,
   ) async {
     for (final entry in archive.files) {
@@ -667,36 +660,15 @@ class McpBundleInstaller {
           'Entry attempts directory traversal: ${entry.name}',
         );
       }
-      final out = File(_join(target.path, relative));
-      await out.parent.create(recursive: true);
-      await out.writeAsBytes(
-        entry.content as List<int>,
-        flush: true,
+      await target.write(
+        relative,
+        Uint8List.fromList(entry.content as List<int>),
       );
     }
   }
 
-  static Future<Directory> _ensureInstallRoot(String installRoot) async {
-    final dir = Directory(installRoot);
-    await dir.create(recursive: true);
-    return dir;
-  }
-
-  static Future<InstalledBundle?> _findExisting(
-    Directory root,
-    String id,
-  ) async {
-    final target = Directory(_join(root.path, id));
-    if (!await target.exists()) return null;
-    final installed = await list(root.path);
-    for (final b in installed) {
-      if (b.id == id) return b;
-    }
-    return null;
-  }
-
   static Future<void> _writeSidecar(
-    String mbdPath, {
+    BundleFileStore target, {
     required McpBundle bundle,
     required Uint8List sourceBytes,
     String? signer,
@@ -717,17 +689,14 @@ class McpBundleInstaller {
       'sourceDigest': sourceDigest,
       'signer': signer,
     };
-    await File(_join(mbdPath, _sidecar)).writeAsString(
-      const JsonEncoder.withIndent('  ').convert(payload),
-      flush: true,
-    );
+    await target.write(_sidecar, encodeJsonBytes(payload));
   }
 
-  static Future<_Sidecar?> _readSidecar(String mbdPath) async {
-    final f = File(_join(mbdPath, _sidecar));
-    if (!await f.exists()) return null;
+  static Future<_Sidecar?> _readSidecar(BundleFileStore source) async {
+    final raw = await source.read(_sidecar);
+    if (raw == null) return null;
     try {
-      final json = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      final json = jsonDecode(utf8.decode(raw)) as Map<String, dynamic>;
       return _Sidecar(
         installedAt:
             DateTime.tryParse(json['installedAt'] as String? ?? '') ??
@@ -739,43 +708,7 @@ class McpBundleInstaller {
     }
   }
 
-  // ── Lock, uuid, path helpers ─────────────────────────────────────────
-
-  static Future<RandomAccessFile> _acquireLock(Directory root) async {
-    final lockFile = File(_join(root.path, _lockFile));
-    await lockFile.create(recursive: true);
-    final handle = await lockFile.open(mode: FileMode.write);
-    try {
-      await handle.lock(FileLock.exclusive);
-    } catch (e) {
-      await handle.close();
-      throw BundleBusyException(root.path);
-    }
-    return handle;
-  }
-
-  static Future<void> _releaseLock(RandomAccessFile handle) async {
-    try {
-      await handle.unlock();
-    } catch (_) {/* swallow */}
-    await handle.close();
-  }
-
-  static String _uuid() {
-    final now = DateTime.now().microsecondsSinceEpoch;
-    final rand = (now * 2654435761) & 0xFFFFFFFF;
-    return '${now.toRadixString(16)}-${rand.toRadixString(16).padLeft(8, '0')}';
-  }
-
-  static String _join(String a, [String? b, String? c]) {
-    final parts = <String>[a, if (b != null) b, if (c != null) c];
-    return parts.join(Platform.pathSeparator);
-  }
-
-  static String _basename(String path) {
-    final i = path.lastIndexOf(Platform.pathSeparator);
-    return i < 0 ? path : path.substring(i + 1);
-  }
+  // ── Entry-path helpers ──────────────────────────────────────────────
 
   static String _normaliseEntryPath(String name) {
     return name.replaceAll(r'\', '/');

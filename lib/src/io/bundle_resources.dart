@@ -3,9 +3,9 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
+import 'bundle_file_store.dart';
 import 'exceptions.dart';
 
 /// The twelve reserved folder names in a bundle's `.mbd/` tree.
@@ -90,55 +90,65 @@ class BundleFolder {
 /// root. All paths are forward-slash separated and resolved relative to
 /// the folder root — absolute paths and `..` traversal are rejected.
 class BundleResources {
-  /// Bind to `<bundleRoot>/<folder.name>`.
+  /// Bind to `<bundleRoot>/<folder.name>` on the local filesystem.
   ///
   /// [bundleRoot] is the absolute path of the `.mbd/` directory.
   /// [folder] selects which reserved sub-tree this surface exposes.
   BundleResources({
     required String bundleRoot,
     required this.folder,
-  }) : _bundleRoot = bundleRoot;
+  }) : _store = FileBundleFileStore(bundleRoot);
+
+  /// Bind to `<folder.name>/` inside an arbitrary [BundleFileStore].
+  ///
+  /// This is the form a host without a filesystem uses — the reserved
+  /// folder layout is unchanged, only where its bytes live.
+  BundleResources.onStore({
+    required BundleFileStore store,
+    required this.folder,
+  }) : _store = store;
 
   /// Which reserved folder this surface points at.
   final BundleFolder folder;
 
-  final String _bundleRoot;
+  final BundleFileStore _store;
 
-  String get _root =>
-      '$_bundleRoot${Platform.pathSeparator}${folder.name}';
+  /// Resolve a caller-supplied relative path to a bundle-root relative
+  /// key, rejecting absolute paths and `..` traversal.
+  String _key(String relativePath) =>
+      '${folder.name}/${normaliseBundlePath(relativePath)}';
 
   /// Read file contents as UTF-8 text.
   ///
   /// Throws [BundleResourceNotFoundException] on missing file.
   Future<String> read(String relativePath) async {
-    final file = _resolve(relativePath);
-    if (!await file.exists()) {
+    final bytes = await _store.read(_key(relativePath));
+    if (bytes == null) {
       throw BundleResourceNotFoundException(folder.name, relativePath);
     }
-    return file.readAsString();
+    return utf8.decode(bytes);
   }
 
   /// Read file contents as raw bytes.
   Future<Uint8List> readBytes(String relativePath) async {
-    final file = _resolve(relativePath);
-    if (!await file.exists()) {
+    final bytes = await _store.read(_key(relativePath));
+    if (bytes == null) {
       throw BundleResourceNotFoundException(folder.name, relativePath);
     }
-    return file.readAsBytes();
+    return bytes;
   }
 
   /// Write UTF-8 text. Creates parent directories as needed.
   Future<void> write(String relativePath, String content) async {
-    final file = _resolve(relativePath);
-    await file.parent.create(recursive: true);
-    await file.writeAsString(content);
+    await _store.write(
+      _key(relativePath),
+      Uint8List.fromList(utf8.encode(content)),
+    );
   }
 
   /// Write raw bytes. Creates parent directories as needed.
   Future<void> writeBytes(String relativePath, Uint8List bytes) async {
-    final file = _resolve(relativePath);
-    await file.parent.create(recursive: true);
-    await file.writeAsBytes(bytes);
+    await _store.write(_key(relativePath), bytes);
   }
 
   /// JSON-encode [value] and write as UTF-8 text. Creates parent
@@ -157,16 +167,12 @@ class BundleResources {
   }
 
   /// Whether the file exists.
-  Future<bool> exists(String relativePath) async {
-    final file = _resolve(relativePath);
-    return file.exists();
-  }
+  Future<bool> exists(String relativePath) =>
+      _store.exists(_key(relativePath));
 
   /// Delete the file. No-op when missing.
-  Future<void> delete(String relativePath) async {
-    final file = _resolve(relativePath);
-    if (await file.exists()) await file.delete();
-  }
+  Future<void> delete(String relativePath) =>
+      _store.delete(_key(relativePath));
 
   /// Enumerate files under this folder.
   ///
@@ -175,21 +181,12 @@ class BundleResources {
   /// forward-slash separators, sorted lexicographically. Returns an
   /// empty list when the folder does not exist.
   Future<List<String>> list({String? extension}) async {
-    final dir = Directory(_root);
-    if (!await dir.exists()) return const [];
-
-    final rootAbs = dir.absolute.path;
+    final prefix = '${folder.name}/';
+    final keys = await _store.list(folder: folder.name);
     final out = <String>[];
-    await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
-      if (extension != null && !entity.path.endsWith(extension)) continue;
-
-      var rel = entity.absolute.path.substring(rootAbs.length);
-      if (rel.startsWith(Platform.pathSeparator)) {
-        rel = rel.substring(Platform.pathSeparator.length);
-      }
-      rel = rel.replaceAll(r'\', '/');
-      out.add(rel);
+    for (final key in keys) {
+      if (extension != null && !key.endsWith(extension)) continue;
+      out.add(key.startsWith(prefix) ? key.substring(prefix.length) : key);
     }
     out.sort();
     return out;
@@ -210,33 +207,6 @@ class BundleResources {
     }
   }
 
-  /// Resolve a caller-supplied relative path against the folder root,
-  /// rejecting absolute paths and any segment that would escape the
-  /// folder via `..`.
-  File _resolve(String relativePath) {
-    if (relativePath.isEmpty) {
-      throw ArgumentError.value(
-          relativePath, 'relativePath', 'Path must not be empty');
-    }
-    // Reject absolute paths (`/foo`, `C:\foo`).
-    if (relativePath.startsWith('/') ||
-        relativePath.startsWith(r'\') ||
-        (relativePath.length > 1 && relativePath[1] == ':')) {
-      throw ArgumentError.value(
-          relativePath, 'relativePath', 'Absolute paths are not allowed');
-    }
-    // Reject `..` traversal.
-    final segments = relativePath.split(RegExp(r'[/\\]'));
-    for (final seg in segments) {
-      if (seg == '..') {
-        throw ArgumentError.value(
-            relativePath, 'relativePath', 'Path traversal is not allowed');
-      }
-    }
-    // Normalise to platform separator.
-    final normalised = relativePath.replaceAll('/', Platform.pathSeparator);
-    return File('$_root${Platform.pathSeparator}$normalised');
-  }
 }
 
 /// Thrown when [BundleResources.read] / [readBytes] is called against a

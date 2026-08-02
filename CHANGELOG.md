@@ -1,3 +1,39 @@
+## [0.4.9] - 2026-08-02 - Bundle files behind a port (web install)
+
+### Added
+- `BundleFileStore` — the contents of one bundle as a port (`read` ·
+  `exists` · `write` · `delete` · `list`), with `FileBundleFileStore`
+  (unchanged filesystem behaviour) and `MemoryBundleFileStore`.
+- `BundleInstallStore` / `BundleStagingArea` — where installed bundles
+  live, as a port. `FileBundleInstallStore` keeps exactly what shipped
+  before (staging directory, `rename` commit, exclusive `.lock`);
+  `MemoryBundleInstallStore` is the reference for stores that have
+  neither rename nor file locks.
+- `McpBundle.store` + `McpBundle.fileStore` — a bundle can name where its
+  files are without naming a filesystem path. `directory` stays and still
+  works; when both are set the store wins.
+- `McpBundleLoader.loadStore` — the store-shaped counterpart to
+  `loadDirectory`. Asset `contentRef`s stay relative (there is no
+  absolute path to rewrite them to).
+- `McpBundleInstaller` `store:` parameter on `installBytes` /
+  `installFile` / `installDirectory` / `installUrl`, plus `listFrom` and
+  `uninstallFrom`. `installRoot:` is now optional rather than required —
+  every existing call site is unaffected, and passing neither is an
+  `ArgumentError`.
+- `InstalledBundle.files` — the installed bundle's file surface, so
+  callers stop having to treat `installPath` as something they can open.
+
+Together these let a host with no filesystem (a browser) install and read
+bundles through storage it supplies. Desktop and mobile behaviour is
+unchanged: omit `store` and the filesystem implementations are used.
+
+### Fixed
+- `McpBundleMutator.mutate` probed the bundle directory *before* joining
+  the mutex, so a caller's queue position depended on when that probe
+  resolved rather than on when the call was issued — the documented FIFO
+  ordering held only by luck and inverted under load. The check now runs
+  inside the protected body.
+
 ## [0.4.8] - 2026-07-14 - AnalysisSourceType.synthetic
 
 ### Added

@@ -3,6 +3,7 @@
 /// Represents a complete MCP Bundle containing all sections.
 library;
 
+import '../io/bundle_file_store.dart';
 import '../io/bundle_resources.dart';
 import 'agent_section.dart';
 import 'asset.dart';
@@ -142,7 +143,31 @@ class McpBundle {
   /// fetch. Consumers that need to read raw UI / asset files — the
   /// runtime's bundle adapter, a bundle-backed MCP server — resolve
   /// paths relative to this root.
+  ///
+  /// Prefer [store] for new code: a path can only name a location the
+  /// host is able to reach with `dart:io`, which excludes hosts that
+  /// have no filesystem. This field stays because it is what every
+  /// existing consumer holds, and because a filesystem-backed bundle
+  /// genuinely has a path worth reporting.
   final String? directory;
+
+  /// Where this bundle's files live, when the host supplied a store
+  /// rather than a path.
+  ///
+  /// [directory] and [store] answer the same question at different
+  /// altitudes: the path says *which folder on this disk*, the store
+  /// says *how to reach the bytes* without assuming there is a disk.
+  /// When both are present the store wins — it is the more specific
+  /// answer, and a host that passed one meant it to be used.
+  final BundleFileStore? store;
+
+  /// The file surface for this bundle, or `null` when it was loaded from
+  /// inline JSON / a remote fetch and carries no backing files.
+  BundleFileStore? get fileStore {
+    if (store != null) return store;
+    final dir = directory;
+    return dir == null ? null : FileBundleFileStore(dir);
+  }
 
   const McpBundle({
     this.schemaVersion = '1.0.0',
@@ -174,6 +199,7 @@ class McpBundle {
     this.settingsSection,
     this.extensions = const {},
     this.directory,
+    this.store,
   });
 
   /// Create from JSON.
@@ -398,6 +424,7 @@ class McpBundle {
     SettingsSection? settingsSection,
     Map<String, dynamic>? extensions,
     String? directory,
+    BundleFileStore? store,
   }) {
     return McpBundle(
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -429,6 +456,7 @@ class McpBundle {
       settingsSection: settingsSection ?? this.settingsSection,
       extensions: extensions ?? this.extensions,
       directory: directory ?? this.directory,
+      store: store ?? this.store,
     );
   }
 
@@ -509,18 +537,18 @@ class McpBundle {
 
   /// Generic accessor — open the reserved sub-folder named [folder]
   /// (e.g. `'ui'`, `'assets'`, `'philosophy'`). Throws [StateError]
-  /// when the bundle has no [directory] (loaded from inline JSON or
+  /// when the bundle carries no files at all (loaded from inline JSON or
   /// remote fetch — there is nowhere to read from).
   BundleResources resources(BundleFolder folder) {
-    final dir = directory;
-    if (dir == null) {
+    final backing = fileStore;
+    if (backing == null) {
       throw StateError(
-        'Bundle has no on-disk directory — load it via '
-        'McpBundleLoader.loadDirectory or .loadInstalled before reading '
-        'reserved-folder resources.',
+        'Bundle has no backing files — load it via '
+        'McpBundleLoader.loadDirectory, .loadInstalled or .loadStore '
+        'before reading reserved-folder resources.',
       );
     }
-    return BundleResources(bundleRoot: dir, folder: folder);
+    return BundleResources.onStore(store: backing, folder: folder);
   }
 
   /// UI definition files (mcp_ui_dsl JSON) under `<bundle>/ui/`.

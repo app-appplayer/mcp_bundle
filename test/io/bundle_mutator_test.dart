@@ -125,6 +125,62 @@ void main() {
       expect(await File('$mbdPath/manifest.json').readAsString(), before);
     });
 
+    test('joins the mutex before its first await', () async {
+      // Regression: `mutate` probed the directory *before* joining the
+      // mutex, so a caller's queue position depended on when that probe
+      // resolved rather than on when the call was issued. FIFO then held
+      // only by luck — under load two callers could invert.
+      //
+      // Racing two callers cannot pin this (the probes usually do resolve
+      // in order). Instead this observes the queue position directly: a
+      // call that will fail its directory check must still wait its turn.
+      // If the check runs ahead of the mutex, the failure lands while the
+      // holder is still inside its body.
+      final mbdPath = await seedBundle();
+      final events = <String>[];
+      final release = Completer<void>();
+
+      final holding = McpBundleMutator.mutate<void>(
+        mbdPath,
+        fn: (current) async {
+          events.add('hold:start');
+          await release.future;
+          events.add('hold:end');
+          return MutationOutcome(
+            updated: McpBundle(manifest: current.manifest),
+            result: null,
+          );
+        },
+      ).catchError((Object _) {
+        // The directory is removed below, so the holder's own commit
+        // fails. Irrelevant here — what is under test is ordering.
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(events, ['hold:start']);
+      await Directory(mbdPath).delete(recursive: true);
+
+      final queued = McpBundleMutator.mutate<void>(
+        mbdPath,
+        fn: (_) async => fail('body must not run for a missing directory'),
+      ).then<void>(
+        (_) => events.add('queued:ok'),
+        onError: (Object _) => events.add('queued:error'),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        events,
+        ['hold:start'],
+        reason: 'the queued call reported before the holder released — it '
+            'did not wait its turn',
+      );
+
+      release.complete();
+      await Future.wait([holding, queued]);
+      expect(events, ['hold:start', 'hold:end', 'queued:error']);
+    });
+
     test('serialises concurrent same-path mutations FIFO', () async {
       final mbdPath = await seedBundle();
       final order = <String>[];
