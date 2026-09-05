@@ -89,6 +89,9 @@ export 'analysis_port.dart';
 export 'analysis_datasource_port.dart';
 export 'analysis_function_port.dart';
 
+/// CeLM — guarded local execution loop.
+export 'celm_port.dart';
+
 // Datastore Port
 export 'datastore_port.dart';
 

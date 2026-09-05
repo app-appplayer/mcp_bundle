@@ -1,3 +1,64 @@
+## [0.4.10] - 2026-09-03
+
+This release carries two additions: the analysis contract gains the fields
+below, and `CelmPort` joins the port set. Both are additive.
+
+### Added — `CelmPort`
+- `CelmPort` — a guarded local execution loop over structured state:
+  `execute` · `cancel` · `observe` · `progress` · `explain` · `resume` ·
+  `standalone`, with `StubCelmPort`. Implemented by `mcp_celm`.
+- `execute` takes a `CelmGoalRef` — a goal id the surface pack defines,
+  plus parameters. It does not accept a goal definition.
+- `execute` returns a `CelmRunHandle`, so a caller has the run id before
+  the outcome and can call `progress` or `cancel` on it. `CelmProgress`
+  carries the outcome once a run has ended, so a caller holding only the
+  id can read the result.
+- Four outcomes: `CelmCompleted` · `CelmEscalated` · `CelmCancelled` ·
+  `CelmRefused` (`goalUnknown` · `goalUnsatisfiable` · `notPermitted` ·
+  `regimeViolation` · `stepUnknown`).
+- `CelmObserveRequest` carries scope **and** depth; `CelmObservation`
+  carries a descriptor **and** a coverage statement, so an absent field
+  inside an examined scope is distinguishable from one nobody looked for.
+  `CelmDepth` is ordered (`satisfies`).
+- `CelmDigest` — what an escalation hands a planner: the fields the
+  blocked check reads, the coverage and the knowledge attached to it.
+- `CelmConclusion` as two types, `ObservedConclusion` and
+  `JudgedConclusion`. An observation carries no confidence; a judgment
+  names its reasoner, its premises and whether that reasoner ran remotely.
+  `CelmConclusion.fromJson` dispatches on `provenance`; each subtype's
+  factory refuses a record whose provenance is not its own.
+- `CelmResumption` as `ResumeAt` · `ResumeWith` · `Abandon`.
+- Every type that crosses the port has `toJson`/`fromJson`. Decoding
+  refuses unknown enum names, missing required fields and missing or
+  mismatched provenance (`celm.unknown_value` · `celm.missing_field` ·
+  `celm.provenance_mismatch`); nothing is coerced to a default.
+
+### Added — analysis
+- `AnalysisStep.id` and `AnalysisStep.resultKey` (`id ?? function`).
+- `AnalysisStep.input` and `AnalysisStepInput` — a step reads a named
+  result field of an earlier step. The source step must run earlier.
+- `AnalysisStep.transforms` — transforms applied to one step's data.
+- `AnalysisOutputDef.from` and `AnalysisOutputDef.sourceKey`
+  (`from ?? name`).
+- `AnalysisOutputDef.field` and `AnalysisOutputDef.indexField` — the
+  result field an artifact is built from, and the field that indexes it.
+- `AnalysisArtifactProvenance.jobId`.
+- `AnalysisFunctionInfo.results` and `AnalysisResultSchema` — result field
+  name, type, element type and unit.
+- `AnalysisInputSource.columnAliases` — renames a source's columns as they
+  are read.
+- `AnalysisInputSource.merge` and `AnalysisSourceMerge` (`append` |
+  `join`). `join` aligns a source onto the first by nearest `_timestamp`
+  and contributes columns.
+- `AnalysisActor` — id, role and groups.
+- `AnalysisPort.listJobs`, `cancelJob`, `deleteSpec` and `listFunctions`.
+- `AnalysisError.toString()` — code, message and step.
+
+All new fields are optional and fall back to the previous behaviour;
+specs and artifacts serialized before this release parse unchanged. Every
+`AnalysisPort` method takes an optional `AnalysisActor`; callers are
+unaffected, implementations widen their overrides.
+
 ## [0.4.9] - 2026-08-02 - Bundle files behind a port (web install)
 
 ### Added

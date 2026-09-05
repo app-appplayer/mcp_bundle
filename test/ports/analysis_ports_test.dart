@@ -412,6 +412,63 @@ void main() {
       });
     });
 
+    group('AnalysisInputSource merge and aliases', () {
+      test('defaults to appending with no aliases', () {
+        final source = AnalysisInputSource(
+          sourceType: AnalysisSourceType.synthetic,
+          query: '{}',
+        );
+        expect(source.merge, equals(AnalysisSourceMerge.append));
+        expect(source.columnAliases, isNull);
+      });
+
+      test('aliases give each channel a name of its own', () {
+        final source = AnalysisInputSource(
+          sourceType: AnalysisSourceType.synthetic,
+          query: '{}',
+          columnAliases: const {'value': 'sensor_b'},
+          merge: AnalysisSourceMerge.join,
+        );
+        expect(source.columnAliases!['value'], equals('sensor_b'));
+        expect(source.merge, equals(AnalysisSourceMerge.join));
+      });
+
+      test('both survive a serialization round-trip', () {
+        final original = AnalysisInputSource(
+          sourceType: AnalysisSourceType.synthetic,
+          query: '{}',
+          columnAliases: const {'value': 'sensor_b'},
+          merge: AnalysisSourceMerge.join,
+        );
+        final restored = AnalysisInputSource.fromJson(original.toJson());
+        expect(restored.columnAliases!['value'], equals('sensor_b'));
+        expect(restored.merge, equals(AnalysisSourceMerge.join));
+      });
+
+      test('toJson omits the defaults', () {
+        final json = AnalysisInputSource(
+          sourceType: AnalysisSourceType.synthetic,
+          query: '{}',
+        ).toJson();
+        expect(json.containsKey('columnAliases'), isFalse);
+        expect(json.containsKey('merge'), isFalse);
+      });
+
+      test('fromJson accepts pre-merge JSON', () {
+        final restored = AnalysisInputSource.fromJson({
+          'sourceType': 'synthetic',
+          'query': '{}',
+        });
+        expect(restored.merge, equals(AnalysisSourceMerge.append));
+        expect(restored.columnAliases, isNull);
+      });
+
+      test('an unknown merge name falls back to append', () {
+        expect(AnalysisSourceMerge.fromString('sideways'),
+            equals(AnalysisSourceMerge.append));
+      });
+    });
+
     group('AnalysisTransform', () {
       test('creates with required fields', () {
         final transform = AnalysisTransform(
@@ -445,7 +502,9 @@ void main() {
       test('creates with required fields', () {
         final step = AnalysisStep(
           function: 'descriptive_stats',
-          parameters: {'columns': ['temp']},
+          parameters: {
+            'columns': ['temp']
+          },
         );
         expect(step.function, equals('descriptive_stats'));
       });
@@ -467,6 +526,127 @@ void main() {
           'function': 'test_fn',
         });
         expect(restored.parameters, isEmpty);
+      });
+
+      test('resultKey falls back to function when id is absent', () {
+        final step = AnalysisStep(function: 'fft', parameters: {});
+        expect(step.id, isNull);
+        expect(step.resultKey, equals('fft'));
+      });
+
+      test('resultKey is the id when set — same function twice', () {
+        final a = AnalysisStep(id: 'fft_x', function: 'fft', parameters: {});
+        final b = AnalysisStep(id: 'fft_y', function: 'fft', parameters: {});
+        expect(a.resultKey, equals('fft_x'));
+        expect(b.resultKey, equals('fft_y'));
+        expect(a.resultKey, isNot(equals(b.resultKey)));
+      });
+
+      test('id survives a serialization round-trip', () {
+        final original =
+            AnalysisStep(id: 'step-1', function: 'fft', parameters: {});
+        final restored = AnalysisStep.fromJson(original.toJson());
+        expect(restored.id, equals('step-1'));
+        expect(restored.resultKey, equals('step-1'));
+      });
+
+      test('toJson omits id when absent — old readers see no new key', () {
+        final json = AnalysisStep(function: 'fft', parameters: {}).toJson();
+        expect(json.containsKey('id'), isFalse);
+      });
+
+      test('fromJson accepts pre-id JSON', () {
+        final restored = AnalysisStep.fromJson({
+          'function': 'fft',
+          'parameters': <String, dynamic>{},
+        });
+        expect(restored.id, isNull);
+        expect(restored.resultKey, equals('fft'));
+        expect(restored.input, isNull);
+      });
+
+      test('input names the step field this step consumes', () {
+        final step = AnalysisStep(
+          id: 'peaks',
+          function: 'peak_detect',
+          parameters: {},
+          input: const AnalysisStepInput(
+            from: 'spectrum',
+            field: 'magnitudes',
+            indexField: 'frequencies',
+          ),
+        );
+        expect(step.input!.from, equals('spectrum'));
+        expect(step.input!.field, equals('magnitudes'));
+        expect(step.input!.indexField, equals('frequencies'));
+        expect(step.input!.column, equals('value'),
+            reason: 'the derived value column has a usable default');
+        expect(step.input!.indexColumn, equals('index'));
+      });
+
+      test('input survives a serialization round-trip', () {
+        final original = AnalysisStep(
+          function: 'peak_detect',
+          parameters: {},
+          input: const AnalysisStepInput(
+            from: 'spectrum',
+            field: 'magnitudes',
+            indexField: 'frequencies',
+            column: 'magnitude',
+            indexColumn: 'frequency',
+          ),
+        );
+        final restored = AnalysisStep.fromJson(original.toJson());
+        expect(restored.input!.from, equals('spectrum'));
+        expect(restored.input!.field, equals('magnitudes'));
+        expect(restored.input!.indexField, equals('frequencies'));
+        expect(restored.input!.column, equals('magnitude'));
+        expect(restored.input!.indexColumn, equals('frequency'));
+      });
+
+      test('a step carries transforms of its own', () {
+        final step = AnalysisStep(
+          id: 'smoothed',
+          function: 'descriptive_stats',
+          parameters: {},
+          transforms: [
+            AnalysisTransform(name: 'clip', parameters: {'max': 10}),
+          ],
+        );
+        expect(step.transforms, hasLength(1));
+        expect(step.transforms.single.name, equals('clip'));
+
+        final restored = AnalysisStep.fromJson(step.toJson());
+        expect(restored.transforms.single.name, equals('clip'));
+        expect(restored.transforms.single.parameters['max'], equals(10));
+      });
+
+      test('a step with no transforms of its own stays empty', () {
+        final step = AnalysisStep(function: 'f', parameters: {});
+        expect(step.transforms, isEmpty);
+        expect(step.toJson().containsKey('transforms'), isFalse);
+        expect(
+          AnalysisStep.fromJson({'function': 'f'}).transforms,
+          isEmpty,
+        );
+      });
+
+      test('toJson omits input and its defaulted column names', () {
+        final json = AnalysisStep(
+          function: 'peak_detect',
+          parameters: {},
+        ).toJson();
+        expect(json.containsKey('input'), isFalse);
+
+        final withInput = AnalysisStep(
+          function: 'peak_detect',
+          parameters: {},
+          input: const AnalysisStepInput(from: 's', field: 'f'),
+        ).toJson();
+        final input = withInput['input']! as Map<String, dynamic>;
+        expect(input.containsKey('column'), isFalse);
+        expect(input.containsKey('indexColumn'), isFalse);
+        expect(input.containsKey('indexField'), isFalse);
       });
     });
 
@@ -502,6 +682,88 @@ void main() {
         expect(restored.name, equals('results_table'));
         expect(restored.parameters!['limit'], equals(100));
       });
+
+      test('sourceKey falls back to name when from is absent', () {
+        final output = AnalysisOutputDef(
+          type: AnalysisArtifactType.metric,
+          name: 'descriptive_stats',
+        );
+        expect(output.from, isNull);
+        expect(output.sourceKey, equals('descriptive_stats'));
+      });
+
+      test('sourceKey is from when set — output name is free', () {
+        final output = AnalysisOutputDef(
+          from: 'step-1',
+          type: AnalysisArtifactType.metric,
+          name: 'rms_value',
+        );
+        expect(output.sourceKey, equals('step-1'));
+      });
+
+      test('from survives a serialization round-trip', () {
+        final original = AnalysisOutputDef(
+          from: 'step-1',
+          type: AnalysisArtifactType.metric,
+          name: 'rms_value',
+        );
+        final restored = AnalysisOutputDef.fromJson(original.toJson());
+        expect(restored.from, equals('step-1'));
+        expect(restored.sourceKey, equals('step-1'));
+      });
+
+      test('toJson omits from when absent', () {
+        final json = AnalysisOutputDef(
+          type: AnalysisArtifactType.metric,
+          name: 'm',
+        ).toJson();
+        expect(json.containsKey('from'), isFalse);
+      });
+
+      test('fromJson accepts pre-from JSON', () {
+        final restored = AnalysisOutputDef.fromJson({
+          'type': 'metric',
+          'name': 'm',
+        });
+        expect(restored.from, isNull);
+        expect(restored.sourceKey, equals('m'));
+        expect(restored.field, isNull);
+        expect(restored.indexField, isNull);
+      });
+
+      test('field and indexField name the result keys to read', () {
+        final output = AnalysisOutputDef(
+          from: 'spectrum',
+          field: 'magnitudes',
+          indexField: 'frequencies',
+          type: AnalysisArtifactType.chart,
+          name: 'spectrum_plot',
+        );
+        expect(output.field, equals('magnitudes'));
+        expect(output.indexField, equals('frequencies'));
+      });
+
+      test('field and indexField survive a serialization round-trip', () {
+        final original = AnalysisOutputDef(
+          from: 'spectrum',
+          field: 'magnitudes',
+          indexField: 'frequencies',
+          type: AnalysisArtifactType.series,
+          name: 'spectrum_series',
+        );
+        final restored = AnalysisOutputDef.fromJson(original.toJson());
+        expect(restored.field, equals('magnitudes'));
+        expect(restored.indexField, equals('frequencies'));
+      });
+
+      test('toJson omits field and indexField when absent', () {
+        final json = AnalysisOutputDef(
+          type: AnalysisArtifactType.metric,
+          name: 'm',
+        ).toJson();
+        expect(json.containsKey('field'), isFalse);
+        expect(json.containsKey('indexField'), isFalse);
+      });
     });
 
     // ---- AnalysisSpec ------------------------------------------------------
@@ -525,7 +787,9 @@ void main() {
           analysisSteps: [
             AnalysisStep(
               function: 'descriptive_stats',
-              parameters: {'columns': ['temperature']},
+              parameters: {
+                'columns': ['temperature']
+              },
             ),
           ],
           outputs: [
@@ -909,6 +1173,42 @@ void main() {
         expect(prov.sourceQuery, isNull);
         expect(prov.inputRange, isNull);
         expect(prov.specId, equals('spec-001'));
+        expect(prov.jobId, isNull);
+      });
+
+      test('jobId distinguishes two runs of one spec', () {
+        AnalysisArtifactProvenance run(String jobId) =>
+            AnalysisArtifactProvenance(
+              version: '1.0.0',
+              createdAt: DateTime.utc(2025, 6, 1),
+              specId: 'spec-001',
+              specVersion: '1.0.0',
+              jobId: jobId,
+            );
+        expect(run('job-a').jobId, equals('job-a'));
+        expect(run('job-b').jobId, equals('job-b'));
+      });
+
+      test('jobId survives a serialization round-trip', () {
+        final original = AnalysisArtifactProvenance(
+          version: '1.0.0',
+          createdAt: DateTime.utc(2025, 6, 1),
+          specId: 'spec-001',
+          specVersion: '1.0.0',
+          jobId: 'job-42',
+        );
+        final restored = AnalysisArtifactProvenance.fromJson(original.toJson());
+        expect(restored.jobId, equals('job-42'));
+      });
+
+      test('fromJson accepts pre-jobId JSON', () {
+        final restored = AnalysisArtifactProvenance.fromJson({
+          'version': '1.0.0',
+          'createdAt': DateTime.utc(2025, 1, 1).toIso8601String(),
+          'specId': 'spec-x',
+          'specVersion': '1.0.0',
+        });
+        expect(restored.jobId, isNull);
       });
 
       test('serialization round-trip', () {
@@ -951,6 +1251,7 @@ void main() {
         expect(json.containsKey('sourceUri'), isFalse);
         expect(json.containsKey('sourceQuery'), isFalse);
         expect(json.containsKey('inputRange'), isFalse);
+        expect(json.containsKey('jobId'), isFalse);
       });
     });
 
@@ -2113,9 +2414,71 @@ void main() {
         expect(info.functionName, equals('descriptive_stats'));
         expect(info.description, equals('Compute descriptive statistics'));
         expect(info.parameters, isEmpty);
+        expect(info.results, isEmpty);
         expect(info.supportedDataTypes, isEmpty);
         expect(info.plugin, isNull);
         expect(info.specVersionRange, isNull);
+      });
+
+      test('results publish the keys an output can bind to', () {
+        final info = AnalysisFunctionInfo(
+          functionName: 'fft',
+          description: 'Fast Fourier transform',
+          results: const {
+            'frequencies': AnalysisResultSchema(
+              name: 'frequencies',
+              type: 'array',
+              itemType: 'number',
+              unit: 'Hz',
+            ),
+            'magnitudes': AnalysisResultSchema(
+              name: 'magnitudes',
+              type: 'array',
+              itemType: 'number',
+            ),
+          },
+        );
+        expect(info.results.keys, containsAll(['frequencies', 'magnitudes']));
+        expect(info.results['frequencies']!.unit, equals('Hz'));
+        expect(info.results['magnitudes']!.itemType, equals('number'));
+      });
+
+      test('results survive a serialization round-trip', () {
+        final original = AnalysisFunctionInfo(
+          functionName: 'fft',
+          description: 'Fast Fourier transform',
+          results: const {
+            'magnitudes': AnalysisResultSchema(
+              name: 'magnitudes',
+              type: 'array',
+              itemType: 'number',
+              description: 'Amplitude per bin',
+            ),
+          },
+        );
+        final restored = AnalysisFunctionInfo.fromJson(original.toJson());
+        expect(restored.results['magnitudes']!.type, equals('array'));
+        expect(restored.results['magnitudes']!.itemType, equals('number'));
+        expect(
+          restored.results['magnitudes']!.description,
+          equals('Amplitude per bin'),
+        );
+      });
+
+      test('toJson omits results when the function declares none', () {
+        final json = AnalysisFunctionInfo(
+          functionName: 'f',
+          description: 'd',
+        ).toJson();
+        expect(json.containsKey('results'), isFalse);
+      });
+
+      test('fromJson accepts pre-results JSON', () {
+        final restored = AnalysisFunctionInfo.fromJson({
+          'functionName': 'f',
+          'description': 'd',
+        });
+        expect(restored.results, isEmpty);
       });
 
       test('creates with all fields', () {
@@ -2353,7 +2716,8 @@ void main() {
         final catalog = await port.getFunctionCatalog();
         expect(catalog.length, equals(1));
         expect(catalog[0].functionName, equals('descriptive_stats'));
-        expect(catalog[0].description, equals('Compute descriptive statistics'));
+        expect(
+            catalog[0].description, equals('Compute descriptive statistics'));
       });
 
       test('registerFunction replaces existing function', () async {
@@ -2430,7 +2794,9 @@ void main() {
 
         final result = await port.executeFunction(
           functionName: 'descriptive_stats',
-          parameters: {'columns': ['value']},
+          parameters: {
+            'columns': ['value']
+          },
           data: dataSet,
         );
         expect(result.functionName, equals('descriptive_stats'));

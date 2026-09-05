@@ -12,6 +12,55 @@ import 'analysis_datasource_port.dart';
 // ---------------------------------------------------------------------------
 
 /// Information about a registered analysis function.
+/// Schema of one field a function puts in its result map.
+///
+/// A function that declares only its parameters is half typed: an author
+/// is told what to pass in and left to guess what comes back. Outputs bind
+/// to a result field by name, so the names have to be published.
+class AnalysisResultSchema {
+  /// Result field name, as it appears as a key of
+  /// [AnalysisFunctionResult.results].
+  final String name;
+
+  /// Field type (number, array, object, string, boolean).
+  final String type;
+
+  /// Element type when [type] is `array` (number, object, string).
+  final String? itemType;
+
+  /// Unit of the value, when it has one (`mm/s`, `Hz`, `dB`).
+  final String? unit;
+
+  /// Description.
+  final String? description;
+
+  const AnalysisResultSchema({
+    required this.name,
+    required this.type,
+    this.itemType,
+    this.unit,
+    this.description,
+  });
+
+  factory AnalysisResultSchema.fromJson(Map<String, dynamic> json) {
+    return AnalysisResultSchema(
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? 'object',
+      itemType: json['itemType'] as String?,
+      unit: json['unit'] as String?,
+      description: json['description'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'type': type,
+        if (itemType != null) 'itemType': itemType,
+        if (unit != null) 'unit': unit,
+        if (description != null) 'description': description,
+      };
+}
+
 class AnalysisFunctionInfo {
   /// Function name (e.g., descriptive_stats, anomaly_detect).
   final String functionName;
@@ -21,6 +70,13 @@ class AnalysisFunctionInfo {
 
   /// Parameter schemas keyed by parameter name.
   final Map<String, AnalysisParameterSchema> parameters;
+
+  /// Result field schemas keyed by field name — what this function puts
+  /// in [AnalysisFunctionResult.results].
+  ///
+  /// Empty means the function has not declared its results; an output
+  /// binding to one of its fields cannot then be checked before the run.
+  final Map<String, AnalysisResultSchema> results;
 
   /// Supported data types (numeric, temporal, categorical, event).
   final List<String> supportedDataTypes;
@@ -36,6 +92,7 @@ class AnalysisFunctionInfo {
     required this.functionName,
     required this.description,
     this.parameters = const {},
+    this.results = const {},
     this.supportedDataTypes = const [],
     this.plugin,
     this.specVersionRange,
@@ -52,6 +109,13 @@ class AnalysisFunctionInfo {
             ),
           ) ??
           {},
+      results: (json['results'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(
+              k,
+              AnalysisResultSchema.fromJson(v as Map<String, dynamic>),
+            ),
+          ) ??
+          {},
       supportedDataTypes:
           (json['supportedDataTypes'] as List<dynamic>?)?.cast<String>() ?? [],
       plugin: json['plugin'] as String?,
@@ -64,6 +128,8 @@ class AnalysisFunctionInfo {
         'description': description,
         if (parameters.isNotEmpty)
           'parameters': parameters.map((k, v) => MapEntry(k, v.toJson())),
+        if (results.isNotEmpty)
+          'results': results.map((k, v) => MapEntry(k, v.toJson())),
         if (supportedDataTypes.isNotEmpty)
           'supportedDataTypes': supportedDataTypes,
         if (plugin != null) 'plugin': plugin,

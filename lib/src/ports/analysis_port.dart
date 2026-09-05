@@ -5,6 +5,8 @@
 /// knowledge packages.
 library;
 
+import 'analysis_function_port.dart';
+
 // ============================================================================
 // Enums
 // ============================================================================
@@ -160,10 +162,9 @@ class AnalysisSpecMetadata {
   factory AnalysisSpecMetadata.fromJson(Map<String, dynamic> json) {
     return AnalysisSpecMetadata(
       author: json['author'] as String?,
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+              [],
       description: json['description'] as String?,
     );
   }
@@ -269,6 +270,34 @@ class AnalysisSourceSchema {
 }
 
 /// Definition of an analysis input source.
+/// How a source's rows join the ones already read.
+enum AnalysisSourceMerge {
+  /// Stack onto what came before: columns union, rows concatenate, sorted
+  /// by `_timestamp`. Right for more of the same reading — another day of
+  /// one sensor.
+  append,
+
+  /// Align onto the first source by nearest `_timestamp`, contributing
+  /// columns rather than rows. Right for a second channel measured
+  /// alongside the first.
+  ///
+  /// Two channels appended instead of aligned end up interleaved with
+  /// nulls, and every function that compares two columns
+  /// (`correlation_regression`, `cross_psd`, `cross_correlation`, `pca`,
+  /// `covariance_matrix`) then reads a column that is half empty. Give the
+  /// sources distinct column names with [AnalysisInputSource.columnAliases]
+  /// so there is something to compare.
+  join;
+
+  /// Parse from string with safe default.
+  static AnalysisSourceMerge fromString(String value) {
+    return AnalysisSourceMerge.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => AnalysisSourceMerge.append,
+    );
+  }
+}
+
 class AnalysisInputSource {
   /// Type of the data source.
   final AnalysisSourceType sourceType;
@@ -285,6 +314,18 @@ class AnalysisInputSource {
   /// Optional schema describing the source structure.
   final AnalysisSourceSchema? schema;
 
+  /// Renames this source's columns as they are read, old name to new.
+  ///
+  /// Sources routinely name their value column the same thing, and two
+  /// columns cannot both be `value` in one dataset — the second is
+  /// dropped and its rows land under the first. Aliasing is what gives
+  /// each channel a name of its own.
+  final Map<String, String>? columnAliases;
+
+  /// How this source's data joins what has already been read. Ignored for
+  /// the first source, which is what the others merge onto.
+  final AnalysisSourceMerge merge;
+
   /// Cannot be const due to Map<String, dynamic> field.
   AnalysisInputSource({
     required this.sourceType,
@@ -292,13 +333,14 @@ class AnalysisInputSource {
     this.filter,
     this.timeRange,
     this.schema,
+    this.columnAliases,
+    this.merge = AnalysisSourceMerge.append,
   });
 
   /// Create from JSON.
   factory AnalysisInputSource.fromJson(Map<String, dynamic> json) {
     return AnalysisInputSource(
-      sourceType:
-          AnalysisSourceType.fromString(json['sourceType'] as String),
+      sourceType: AnalysisSourceType.fromString(json['sourceType'] as String),
       query: json['query'] as String?,
       filter: json['filter'] as Map<String, dynamic>?,
       timeRange: json['timeRange'] != null
@@ -309,6 +351,11 @@ class AnalysisInputSource {
           ? AnalysisSourceSchema.fromJson(
               json['schema'] as Map<String, dynamic>)
           : null,
+      columnAliases: (json['columnAliases'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, v.toString())),
+      merge: json['merge'] == null
+          ? AnalysisSourceMerge.append
+          : AnalysisSourceMerge.fromString(json['merge'] as String),
     );
   }
 
@@ -319,6 +366,9 @@ class AnalysisInputSource {
         if (filter != null) 'filter': filter,
         if (timeRange != null) 'timeRange': timeRange!.toJson(),
         if (schema != null) 'schema': schema!.toJson(),
+        if (columnAliases != null && columnAliases!.isNotEmpty)
+          'columnAliases': columnAliases,
+        if (merge != AnalysisSourceMerge.append) 'merge': merge.name,
       };
 }
 
@@ -352,7 +402,69 @@ class AnalysisTransform {
 }
 
 /// An individual analysis computation step.
+/// Where a step reads its data from, when that is another step's result
+/// rather than the spec's input sources.
+///
+/// Steps used to be siblings: every one of them ran over the same dataset
+/// and none could see what another produced, so a spectrum could be
+/// computed and then not be the thing the next step looked at. This is the
+/// output binding turned around — an output names the step field it
+/// carries, a step names the field it consumes.
+class AnalysisStepInput {
+  /// [AnalysisStep.resultKey] of the step that produces the data.
+  ///
+  /// Must name a step that runs earlier in [AnalysisSpec.analysisSteps];
+  /// execution is a forward pass, which is also what keeps the graph
+  /// acyclic without a cycle check.
+  final String from;
+
+  /// Result field of the source step that becomes the value column.
+  final String field;
+
+  /// Result field that becomes the index column, if any.
+  final String? indexField;
+
+  /// Name the value column takes in the derived dataset.
+  final String column;
+
+  /// Name the index column takes in the derived dataset.
+  final String indexColumn;
+
+  const AnalysisStepInput({
+    required this.from,
+    required this.field,
+    this.indexField,
+    this.column = 'value',
+    this.indexColumn = 'index',
+  });
+
+  factory AnalysisStepInput.fromJson(Map<String, dynamic> json) {
+    return AnalysisStepInput(
+      from: json['from'] as String? ?? '',
+      field: json['field'] as String? ?? '',
+      indexField: json['indexField'] as String?,
+      column: json['column'] as String? ?? 'value',
+      indexColumn: json['indexColumn'] as String? ?? 'index',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'from': from,
+        'field': field,
+        if (indexField != null) 'indexField': indexField,
+        if (column != 'value') 'column': column,
+        if (indexColumn != 'index') 'indexColumn': indexColumn,
+      };
+}
+
 class AnalysisStep {
+  /// Identifier of this step within the spec, unique among its siblings.
+  ///
+  /// Steps are addressed by [resultKey], which falls back to [function]
+  /// when this is null. Without an id a spec cannot run the same function
+  /// twice — the two results would collide under one key.
+  final String? id;
+
   /// Analysis function name (descriptive_stats, anomaly_detect,
   /// event_analysis, etc.).
   final String function;
@@ -360,29 +472,84 @@ class AnalysisStep {
   /// Function-specific parameters.
   final Map<String, dynamic> parameters;
 
+  /// Data this step reads, when it reads another step's result rather
+  /// than the spec's input sources. Null means the source dataset.
+  final AnalysisStepInput? input;
+
+  /// Transforms applied to this step's data before its function runs.
+  ///
+  /// [AnalysisSpec.transforms] run once, over the merged sources, before
+  /// any step — so there was nowhere to put a reshaping that belongs to
+  /// one step, and nowhere at all to put one between two steps.
+  final List<AnalysisTransform> transforms;
+
   /// Cannot be const due to Map<String, dynamic> field.
   AnalysisStep({
+    this.id,
     required this.function,
     required this.parameters,
+    this.input,
+    this.transforms = const [],
   });
+
+  /// Key this step's results are stored and addressed under.
+  String get resultKey => id ?? function;
 
   /// Create from JSON.
   factory AnalysisStep.fromJson(Map<String, dynamic> json) {
     return AnalysisStep(
+      id: json['id'] as String?,
       function: json['function'] as String,
       parameters: json['parameters'] as Map<String, dynamic>? ?? {},
+      input: json['input'] == null
+          ? null
+          : AnalysisStepInput.fromJson(json['input'] as Map<String, dynamic>),
+      transforms: (json['transforms'] as List<dynamic>?)
+              ?.map(
+                  (e) => AnalysisTransform.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
         'function': function,
         'parameters': parameters,
+        if (input != null) 'input': input!.toJson(),
+        if (transforms.isNotEmpty)
+          'transforms': transforms.map((t) => t.toJson()).toList(),
       };
 }
 
 /// Definition of an expected analysis output artifact.
 class AnalysisOutputDef {
+  /// [AnalysisStep.resultKey] of the step whose results fill this output.
+  ///
+  /// Null means the output carries [name], which is why an output named
+  /// after nothing in the spec used to produce an empty artifact instead
+  /// of an error. Resolution is the engine's, but the binding is declared
+  /// here so it survives serialization.
+  final String? from;
+
+  /// Result field of the source step this artifact is built from — a key
+  /// of [AnalysisFunctionResult.results], declared by the function in
+  /// [AnalysisFunctionInfo.results].
+  ///
+  /// Null keeps the conventional reading, where the artifact type dictates
+  /// the key it looks for (`value` for a metric, `points` for a series,
+  /// `columns` + `rows` for a table). Most functions return neither, which
+  /// is why naming the field is what makes their results reachable as
+  /// anything richer than an encoded blob.
+  final String? field;
+
+  /// Result field supplying the index of a series or the x axis of a
+  /// chart — frequencies against magnitudes, timestamps against values.
+  ///
+  /// Null indexes by position.
+  final String? indexField;
+
   /// Type of artifact to produce.
   final AnalysisArtifactType type;
 
@@ -394,14 +561,23 @@ class AnalysisOutputDef {
 
   /// Cannot be const due to Map<String, dynamic> field.
   AnalysisOutputDef({
+    this.from,
+    this.field,
+    this.indexField,
     required this.type,
     required this.name,
     this.parameters,
   });
 
+  /// Step key this output reads from.
+  String get sourceKey => from ?? name;
+
   /// Create from JSON.
   factory AnalysisOutputDef.fromJson(Map<String, dynamic> json) {
     return AnalysisOutputDef(
+      from: json['from'] as String?,
+      field: json['field'] as String?,
+      indexField: json['indexField'] as String?,
       type: AnalysisArtifactType.fromString(json['type'] as String),
       name: json['name'] as String,
       parameters: json['parameters'] as Map<String, dynamic>?,
@@ -410,6 +586,9 @@ class AnalysisOutputDef {
 
   /// Convert to JSON.
   Map<String, dynamic> toJson() => {
+        if (from != null) 'from': from,
+        if (field != null) 'field': field,
+        if (indexField != null) 'indexField': indexField,
         'type': type.name,
         'name': name,
         if (parameters != null) 'parameters': parameters,
@@ -461,12 +640,11 @@ class AnalysisSpec {
       specId: json['specId'] as String,
       version: json['version'] as String,
       inputSources: (json['inputSources'] as List<dynamic>)
-          .map(
-              (e) => AnalysisInputSource.fromJson(e as Map<String, dynamic>))
+          .map((e) => AnalysisInputSource.fromJson(e as Map<String, dynamic>))
           .toList(),
       transforms: (json['transforms'] as List<dynamic>?)
-              ?.map((e) =>
-                  AnalysisTransform.fromJson(e as Map<String, dynamic>))
+              ?.map(
+                  (e) => AnalysisTransform.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       analysisSteps: (json['analysisSteps'] as List<dynamic>)
@@ -594,6 +772,16 @@ class AnalysisError {
         if (step != null) 'step': step,
         if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
       };
+
+  /// Code, message and originating step.
+  ///
+  /// Engines wrap a caught error into a new one by interpolating it into a
+  /// message. Without this the wrapper reads `Instance of 'AnalysisError'`
+  /// and the cause is gone — every failure of a kind looks identical, in
+  /// the job record a caller reads back.
+  @override
+  String toString() =>
+      step == null ? '$code: $message' : '$code at $step: $message';
 }
 
 /// Represents a running or completed analysis job.
@@ -684,13 +872,11 @@ class AnalysisJob {
               .toList() ??
           [],
       logs: (json['logs'] as List<dynamic>?)
-              ?.map(
-                  (e) => AnalysisJobLog.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => AnalysisJobLog.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       errors: (json['errors'] as List<dynamic>?)
-              ?.map(
-                  (e) => AnalysisError.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => AnalysisError.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
     );
@@ -710,10 +896,8 @@ class AnalysisJob {
         if (inputRange != null) 'inputRange': inputRange!.toJson(),
         if (parameters.isNotEmpty) 'parameters': parameters,
         if (artifactIds.isNotEmpty) 'artifactIds': artifactIds,
-        if (logs.isNotEmpty)
-          'logs': logs.map((l) => l.toJson()).toList(),
-        if (errors.isNotEmpty)
-          'errors': errors.map((e) => e.toJson()).toList(),
+        if (logs.isNotEmpty) 'logs': logs.map((l) => l.toJson()).toList(),
+        if (errors.isNotEmpty) 'errors': errors.map((e) => e.toJson()).toList(),
       };
 }
 
@@ -747,6 +931,13 @@ class AnalysisArtifactProvenance {
   /// Version of the spec that produced this artifact.
   final String specVersion;
 
+  /// Identifier of the job run that produced this artifact.
+  ///
+  /// The spec says what was computed; this says which run computed it.
+  /// Without it artifacts from separate runs of the same spec cannot be
+  /// told apart, so a per-job query has nothing to filter on.
+  final String? jobId;
+
   const AnalysisArtifactProvenance({
     required this.version,
     this.tags = const [],
@@ -756,16 +947,16 @@ class AnalysisArtifactProvenance {
     this.inputRange,
     required this.specId,
     required this.specVersion,
+    this.jobId,
   });
 
   /// Create from JSON.
   factory AnalysisArtifactProvenance.fromJson(Map<String, dynamic> json) {
     return AnalysisArtifactProvenance(
       version: json['version'] as String,
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+              [],
       createdAt: DateTime.parse(json['createdAt'] as String),
       sourceUri: json['sourceUri'] as String?,
       sourceQuery: json['sourceQuery'] as String?,
@@ -775,6 +966,7 @@ class AnalysisArtifactProvenance {
           : null,
       specId: json['specId'] as String,
       specVersion: json['specVersion'] as String,
+      jobId: json['jobId'] as String?,
     );
   }
 
@@ -788,6 +980,7 @@ class AnalysisArtifactProvenance {
         if (inputRange != null) 'inputRange': inputRange!.toJson(),
         'specId': specId,
         'specVersion': specVersion,
+        if (jobId != null) 'jobId': jobId,
       };
 }
 
@@ -988,8 +1181,8 @@ class AnalysisMetricArtifact extends AnalysisArtifact {
           json['provenance'] as Map<String, dynamic>),
       value: json['value'],
       unit: json['unit'] as String,
-      timeRange: AnalysisTimeRange.fromJson(
-          json['timeRange'] as Map<String, dynamic>),
+      timeRange:
+          AnalysisTimeRange.fromJson(json['timeRange'] as Map<String, dynamic>),
     );
   }
 
@@ -1068,9 +1261,8 @@ class AnalysisTableArtifact extends AnalysisArtifact {
       name: json['name'] as String,
       provenance: AnalysisArtifactProvenance.fromJson(
           json['provenance'] as Map<String, dynamic>),
-      columns: (json['columns'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
+      columns:
+          (json['columns'] as List<dynamic>).map((e) => e as String).toList(),
       rows: (json['rows'] as List<dynamic>)
           .map((e) => e as Map<String, dynamic>)
           .toList(),
@@ -1120,13 +1312,11 @@ class AnalysisChartArtifact extends AnalysisArtifact {
       provenance: AnalysisArtifactProvenance.fromJson(
           json['provenance'] as Map<String, dynamic>),
       series: (json['series'] as List<dynamic>)
-          .map((e) =>
-              AnalysisSeriesArtifact.fromJson(e as Map<String, dynamic>))
+          .map(
+              (e) => AnalysisSeriesArtifact.fromJson(e as Map<String, dynamic>))
           .toList(),
-      xAxis: AnalysisAxisMeta.fromJson(
-          json['xAxis'] as Map<String, dynamic>),
-      yAxis: AnalysisAxisMeta.fromJson(
-          json['yAxis'] as Map<String, dynamic>),
+      xAxis: AnalysisAxisMeta.fromJson(json['xAxis'] as Map<String, dynamic>),
+      yAxis: AnalysisAxisMeta.fromJson(json['yAxis'] as Map<String, dynamic>),
       units: (json['units'] as Map<String, dynamic>?)
           ?.map((k, v) => MapEntry(k, v as String)),
     );
@@ -1179,8 +1369,7 @@ class AnalysisSummaryArtifact extends AnalysisArtifact {
         ...baseToJson(),
         'text': text,
         if (evidenceLinks.isNotEmpty)
-          'evidenceLinks':
-              evidenceLinks.map((l) => l.toJson()).toList(),
+          'evidenceLinks': evidenceLinks.map((l) => l.toJson()).toList(),
       };
 }
 
@@ -1212,8 +1401,7 @@ class AnalysisAlertRuleArtifact extends AnalysisArtifact {
       provenance: AnalysisArtifactProvenance.fromJson(
           json['provenance'] as Map<String, dynamic>),
       condition: json['condition'] as String,
-      severity:
-          AnalysisAlertSeverity.fromString(json['severity'] as String),
+      severity: AnalysisAlertSeverity.fromString(json['severity'] as String),
       actionHook: json['actionHook'] as String?,
     );
   }
@@ -1309,8 +1497,7 @@ class AnalysisAlert {
   factory AnalysisAlert.fromJson(Map<String, dynamic> json) {
     return AnalysisAlert(
       alertRuleId: json['alertRuleId'] as String,
-      severity:
-          AnalysisAlertSeverity.fromString(json['severity'] as String),
+      severity: AnalysisAlertSeverity.fromString(json['severity'] as String),
       timestamp: DateTime.parse(json['timestamp'] as String),
       condition: json['condition'] as String,
       currentValue: json['currentValue'],
@@ -1339,12 +1526,52 @@ class AnalysisAlert {
 ///
 /// Provides contracts for managing analysis specifications, running analysis
 /// jobs, retrieving artifacts, and evaluating alert rules.
+/// Who is asking.
+///
+/// The port used to carry no identity at all, so a host calling it had
+/// nothing to authorize against: role checks evaluated only when a caller
+/// deeper in the stack happened to supply a context, audit records were
+/// written against `system`, and masking never ran. A governance layer
+/// answering to nobody is decoration.
+class AnalysisActor {
+  /// Stable identifier recorded in the audit trail.
+  final String id;
+
+  /// Role the permission set is looked up by.
+  final String role;
+
+  /// Groups the actor belongs to, for ownership checks.
+  final List<String> groups;
+
+  const AnalysisActor({
+    required this.id,
+    required this.role,
+    this.groups = const [],
+  });
+
+  factory AnalysisActor.fromJson(Map<String, dynamic> json) {
+    return AnalysisActor(
+      id: json['id'] as String? ?? '',
+      role: json['role'] as String? ?? '',
+      groups:
+          (json['groups'] as List<dynamic>?)?.map((e) => '$e').toList() ?? [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'role': role,
+        if (groups.isNotEmpty) 'groups': groups,
+      };
+}
+
 abstract class AnalysisPort {
   /// List available analysis specifications.
   Future<List<AnalysisSpec>> listSpecs({
     String? search,
     int? limit,
     int? offset,
+    AnalysisActor? actor,
   });
 
   /// Run an analysis job using the given spec and parameters.
@@ -1353,10 +1580,28 @@ abstract class AnalysisPort {
     required Map<String, dynamic> parameters,
     AnalysisExecutionMode mode = AnalysisExecutionMode.batch,
     AnalysisTimeRange? timeRange,
+    AnalysisActor? actor,
   });
 
   /// Get a job by ID, or null if not found.
-  Future<AnalysisJob?> getJob(String jobId);
+  Future<AnalysisJob?> getJob(String jobId, {AnalysisActor? actor});
+
+  /// List jobs, most recent first.
+  ///
+  /// Without this a caller could read back only the jobs whose ids it had
+  /// kept, so a run whose id was lost was unreachable and the history was
+  /// not enumerable at all.
+  Future<List<AnalysisJob>> listJobs({
+    String? specId,
+    AnalysisJobStatus? status,
+    int? limit,
+    AnalysisActor? actor,
+  });
+
+  /// Cancel a running job.
+  ///
+  /// A streaming job runs until something stops it, and nothing could.
+  Future<AnalysisJob> cancelJob(String jobId, {AnalysisActor? actor});
 
   /// Get artifacts filtered by various criteria.
   Future<List<AnalysisArtifact>> getArtifacts({
@@ -1366,16 +1611,38 @@ abstract class AnalysisPort {
     List<String>? tags,
     AnalysisTimeRange? timeRange,
     int? limit,
+    AnalysisActor? actor,
   });
 
   /// Create a new analysis specification.
-  Future<AnalysisSpec> createSpec(AnalysisSpec spec);
+  Future<AnalysisSpec> createSpec(AnalysisSpec spec, {AnalysisActor? actor});
 
   /// Update an existing analysis specification.
-  Future<AnalysisSpec> updateSpec(String specId, AnalysisSpec spec);
+  Future<AnalysisSpec> updateSpec(
+    String specId,
+    AnalysisSpec spec, {
+    AnalysisActor? actor,
+  });
+
+  /// Delete a specification.
+  Future<void> deleteSpec(String specId, {AnalysisActor? actor});
+
+  /// Describe the analysis functions available to a spec.
+  ///
+  /// A spec names functions and their result fields, so whoever writes one
+  /// has to know what exists and what it returns. Without this the catalog
+  /// was reachable only from inside the engine, and an author — a person
+  /// or a model — had to guess.
+  Future<List<AnalysisFunctionInfo>> listFunctions({
+    String? search,
+    AnalysisActor? actor,
+  });
 
   /// Evaluate an alert rule and return the result.
-  Future<AnalysisAlert> evaluateAlert(String alertRuleId);
+  Future<AnalysisAlert> evaluateAlert(
+    String alertRuleId, {
+    AnalysisActor? actor,
+  });
 }
 
 // ============================================================================
@@ -1395,6 +1662,7 @@ class StubAnalysisPort implements AnalysisPort {
     String? search,
     int? limit,
     int? offset,
+    AnalysisActor? actor,
   }) async {
     var results = List<AnalysisSpec>.from(_specs);
 
@@ -1428,6 +1696,7 @@ class StubAnalysisPort implements AnalysisPort {
     required Map<String, dynamic> parameters,
     AnalysisExecutionMode mode = AnalysisExecutionMode.batch,
     AnalysisTimeRange? timeRange,
+    AnalysisActor? actor,
   }) async {
     final now = DateTime.now();
     final jobId = 'job_${_jobs.length}';
@@ -1449,7 +1718,7 @@ class StubAnalysisPort implements AnalysisPort {
   }
 
   @override
-  Future<AnalysisJob?> getJob(String jobId) async {
+  Future<AnalysisJob?> getJob(String jobId, {AnalysisActor? actor}) async {
     return _jobs[jobId];
   }
 
@@ -1461,18 +1730,26 @@ class StubAnalysisPort implements AnalysisPort {
     List<String>? tags,
     AnalysisTimeRange? timeRange,
     int? limit,
+    AnalysisActor? actor,
   }) async {
     return [];
   }
 
   @override
-  Future<AnalysisSpec> createSpec(AnalysisSpec spec) async {
+  Future<AnalysisSpec> createSpec(
+    AnalysisSpec spec, {
+    AnalysisActor? actor,
+  }) async {
     _specs.add(spec);
     return spec;
   }
 
   @override
-  Future<AnalysisSpec> updateSpec(String specId, AnalysisSpec spec) async {
+  Future<AnalysisSpec> updateSpec(
+    String specId,
+    AnalysisSpec spec, {
+    AnalysisActor? actor,
+  }) async {
     final index = _specs.indexWhere((s) => s.specId == specId);
     if (index >= 0) {
       _specs[index] = spec;
@@ -1483,7 +1760,73 @@ class StubAnalysisPort implements AnalysisPort {
   }
 
   @override
-  Future<AnalysisAlert> evaluateAlert(String alertRuleId) async {
+  @override
+  Future<List<AnalysisJob>> listJobs({
+    String? specId,
+    AnalysisJobStatus? status,
+    int? limit,
+    AnalysisActor? actor,
+  }) async {
+    var results = _jobs.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (specId != null) {
+      results = results.where((j) => j.specId == specId).toList();
+    }
+    if (status != null) {
+      results = results.where((j) => j.status == status).toList();
+    }
+    if (limit != null && limit > 0 && limit < results.length) {
+      results = results.sublist(0, limit);
+    }
+    return results;
+  }
+
+  @override
+  Future<AnalysisJob> cancelJob(String jobId, {AnalysisActor? actor}) async {
+    final job = _jobs[jobId];
+    if (job == null) {
+      throw AnalysisError(
+        code: 'job.not_found',
+        message: 'Job "$jobId" not found',
+        details: {'jobId': jobId},
+      );
+    }
+    final canceled = AnalysisJob(
+      jobId: job.jobId,
+      specId: job.specId,
+      specVersion: job.specVersion,
+      mode: job.mode,
+      status: AnalysisJobStatus.canceled,
+      progress: job.progress,
+      createdAt: job.createdAt,
+      startTime: job.startTime,
+      endTime: DateTime.now(),
+      parameters: job.parameters,
+      artifactIds: job.artifactIds,
+      logs: job.logs,
+      errors: job.errors,
+    );
+    _jobs[jobId] = canceled;
+    return canceled;
+  }
+
+  @override
+  Future<void> deleteSpec(String specId, {AnalysisActor? actor}) async {
+    _specs.removeWhere((s) => s.specId == specId);
+  }
+
+  @override
+  Future<List<AnalysisFunctionInfo>> listFunctions({
+    String? search,
+    AnalysisActor? actor,
+  }) async =>
+      const [];
+
+  @override
+  Future<AnalysisAlert> evaluateAlert(
+    String alertRuleId, {
+    AnalysisActor? actor,
+  }) async {
     return AnalysisAlert(
       alertRuleId: alertRuleId,
       severity: AnalysisAlertSeverity.info,
