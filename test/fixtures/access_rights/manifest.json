@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifest": {
+    "id": "com.example.attendance",
+    "name": "Attendance",
+    "version": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "type": "application",
+    "accessRights": [
+      {
+        "id": "attendance.read",
+        "label": {"en": "View attendance", "ko": "출결 보기"},
+        "risk": "read",
+        "default": "member"
+      },
+      {
+        "id": "attendance.write",
+        "label": {"en": "Record attendance", "ko": "출결 기록"},
+        "description": {"en": "Create and change attendance records."},
+        "risk": "write",
+        "default": "none"
+      },
+      {
+        "id": "attendance.purge",
+        "label": {"en": "Delete attendance history"},
+        "risk": "danger",
+        "default": "admin"
+      }
+    ]
+  },
+  "tools": {
+    "schemaVersion": "1.0.0",
+    "tools": [
+      {"name": "listAttendance", "kind": "host", "accessRight": "attendance.read", "scoped": true},
+      {"name": "recordAttendance", "kind": "host", "accessRight": "attendance.write", "scoped": true},
+      {"name": "purgeAttendance", "kind": "host", "accessRight": "attendance.purge"},
+      {"name": "ping", "kind": "host"}
+    ]
+  }
+}

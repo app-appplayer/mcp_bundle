@@ -12,6 +12,7 @@ library mcp_bundle;
 // Models
 export 'src/models/bundle.dart';
 export 'src/models/manifest.dart';
+export 'src/models/access_right.dart';
 export 'src/models/ui_section.dart';
 export 'src/models/flow_section.dart';
 export 'src/models/skill_section.dart';

@@ -188,6 +188,14 @@ class ToolEntry {
   /// invoke this tool. `null` = unscoped (host-default access).
   final List<String>? agentScope;
 
+  /// Id of the manifest access right a caller must hold to invoke this
+  /// tool. `null` = the implicit `use` right only.
+  final String? accessRight;
+
+  /// Whether the records this tool reads or writes belong to the caller's
+  /// unit — the host attaches and filters by it; the tool does not.
+  final bool scoped;
+
   /// Free-form metadata for host-specific extension.
   final Map<String, dynamic> metadata;
 
@@ -200,6 +208,8 @@ class ToolEntry {
     this.inputSchema,
     this.outputSchema,
     this.agentScope,
+    this.accessRight,
+    this.scoped = false,
     this.metadata = const {},
   });
 
@@ -214,6 +224,8 @@ class ToolEntry {
       inputSchema: (json['inputSchema'] as Map?)?.cast<String, dynamic>(),
       outputSchema: (json['outputSchema'] as Map?)?.cast<String, dynamic>(),
       agentScope: (json['agentScope'] as List?)?.cast<String>(),
+      accessRight: json['accessRight'] as String?,
+      scoped: json['scoped'] as bool? ?? false,
       metadata:
           (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
     );
@@ -229,6 +241,8 @@ class ToolEntry {
         if (inputSchema != null) 'inputSchema': inputSchema,
         if (outputSchema != null) 'outputSchema': outputSchema,
         if (agentScope != null) 'agentScope': agentScope,
+        if (accessRight != null) 'accessRight': accessRight,
+        if (scoped) 'scoped': true,
         if (metadata.isNotEmpty) 'metadata': metadata,
       };
 
@@ -242,6 +256,8 @@ class ToolEntry {
     Map<String, dynamic>? inputSchema,
     Map<String, dynamic>? outputSchema,
     List<String>? agentScope,
+    String? accessRight,
+    bool? scoped,
     Map<String, dynamic>? metadata,
   }) {
     return ToolEntry(
@@ -253,6 +269,8 @@ class ToolEntry {
       inputSchema: inputSchema ?? this.inputSchema,
       outputSchema: outputSchema ?? this.outputSchema,
       agentScope: agentScope ?? this.agentScope,
+      accessRight: accessRight ?? this.accessRight,
+      scoped: scoped ?? this.scoped,
       metadata: metadata ?? this.metadata,
     );
   }

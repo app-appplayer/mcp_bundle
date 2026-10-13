@@ -5,6 +5,7 @@
 library;
 
 import '../models/bundle.dart';
+import '../models/access_right.dart';
 import '../models/manifest.dart';
 import '../models/ui_section.dart';
 import '../models/flow_section.dart';
@@ -169,7 +170,8 @@ class McpBundleValidator {
       errors.addAll(_validateRunbooksSection(bundle.runbooks!));
     }
     if (bundle.tools != null) {
-      errors.addAll(_validateToolsSection(bundle.tools!));
+      errors.addAll(
+          _validateToolsSection(bundle.tools!, bundle.manifest.accessRights));
     }
     if (bundle.requires != null) {
       errors.addAll(_validateRequiresSection(bundle.requires!));
@@ -199,7 +201,8 @@ class McpBundleValidator {
       if (!idPattern.hasMatch(manifest.id)) {
         errors.add(const ValidationError(
           code: McpValidationCodes.invalidPattern,
-          message: 'Invalid bundle ID format: must be lowercase with dots/underscores',
+          message:
+              'Invalid bundle ID format: must be lowercase with dots/underscores',
           location: 'manifest.id',
         ));
       }
@@ -230,6 +233,76 @@ class McpBundleValidator {
           code: McpValidationCodes.invalidPattern,
           message: 'Invalid version format (expected semver)',
           location: 'manifest.version',
+        ));
+      }
+    }
+
+    errors.addAll(_validateAccessRights(manifest.accessRights));
+
+    return errors;
+  }
+
+  static List<ValidationError> _validateAccessRights(
+      List<AccessRight> accessRights) {
+    final errors = <ValidationError>[];
+    final ids = <String>{};
+    final idPattern = RegExp(r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$');
+
+    for (var i = 0; i < accessRights.length; i++) {
+      final accessRight = accessRights[i];
+      final path = 'manifest.accessRights[$i]';
+
+      if (accessRight.id.isEmpty) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Access right id is required',
+          location: '$path.id',
+        ));
+      } else if (accessRight.id == implicitUseAccessRight) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.invalidValue,
+          message: 'Access right id "$implicitUseAccessRight" is reserved: '
+              'every installed app has it',
+          location: '$path.id',
+        ));
+      } else if (!idPattern.hasMatch(accessRight.id)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.invalidPattern,
+          message: 'Invalid access right id: must be lowercase with '
+              'dots/underscores',
+          location: '$path.id',
+        ));
+      } else if (!ids.add(accessRight.id)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.duplicateId,
+          message: 'Duplicate access right id: ${accessRight.id}',
+          location: '$path.id',
+        ));
+      }
+
+      if (accessRight.label.isEmpty ||
+          accessRight.label.values.any((text) => text.isEmpty)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.missingRequired,
+          message: 'Access right label needs at least one non-empty entry '
+              'per language',
+          location: '$path.label',
+        ));
+      }
+
+      if (accessRight.risk == AccessRisk.unknown) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.invalidValue,
+          message: 'Access right risk must be one of read/write/danger',
+          location: '$path.risk',
+        ));
+      }
+
+      if (accessRight.defaultGrant == AccessDefault.unknown) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.invalidValue,
+          message: 'Access right default must be one of none/member/admin',
+          location: '$path.default',
         ));
       }
     }
@@ -282,7 +355,8 @@ class McpBundleValidator {
     return errors;
   }
 
-  static List<ValidationError> _validateWidgetNode(WidgetNode widget, String path) {
+  static List<ValidationError> _validateWidgetNode(
+      WidgetNode widget, String path) {
     final errors = <ValidationError>[];
 
     // Required: type
@@ -296,12 +370,14 @@ class McpBundleValidator {
 
     // Validate actions
     for (final entry in widget.actions.entries) {
-      errors.addAll(_validateAction(entry.value, '$path.actions[${entry.key}]'));
+      errors
+          .addAll(_validateAction(entry.value, '$path.actions[${entry.key}]'));
     }
 
     // Recursive validation for children
     for (var i = 0; i < widget.children.length; i++) {
-      errors.addAll(_validateWidgetNode(widget.children[i], '$path.children[$i]'));
+      errors.addAll(
+          _validateWidgetNode(widget.children[i], '$path.children[$i]'));
     }
 
     return errors;
@@ -504,7 +580,8 @@ class McpBundleValidator {
         ruleIds.add(rule.id);
 
         // Validate condition
-        errors.addAll(_validatePolicyCondition(rule.condition, '$rulePath.condition'));
+        errors.addAll(
+            _validatePolicyCondition(rule.condition, '$rulePath.condition'));
       }
 
       // Validate priority range (0-100)
@@ -537,7 +614,8 @@ class McpBundleValidator {
         }
         // Validate "between" operator has a [min, max] list value
         if (condition.operator == ThresholdOperator.between) {
-          if (condition.value is! List || (condition.value as List).length != 2) {
+          if (condition.value is! List ||
+              (condition.value as List).length != 2) {
             errors.add(ValidationError(
               code: McpValidationCodes.invalidValue,
               message: 'Between operator requires [min, max] value',
@@ -550,7 +628,8 @@ class McpBundleValidator {
         if (condition.conditions.isEmpty) {
           errors.add(ValidationError(
             code: McpValidationCodes.missingRequired,
-            message: 'Composite condition requires at least one child condition',
+            message:
+                'Composite condition requires at least one child condition',
             location: '$path.conditions',
           ));
         }
@@ -644,7 +723,18 @@ class McpBundleValidator {
         propertyNames.add(property.name);
 
         // Validate property type
-        final validTypes = ['string', 'number', 'integer', 'double', 'boolean', 'date', 'datetime', 'list', 'map', 'object'];
+        final validTypes = [
+          'string',
+          'number',
+          'integer',
+          'double',
+          'boolean',
+          'date',
+          'datetime',
+          'list',
+          'map',
+          'object'
+        ];
         if (!validTypes.contains(property.type.toLowerCase())) {
           errors.add(ValidationError(
             code: McpValidationCodes.invalidValue,
@@ -735,7 +825,14 @@ class McpBundleValidator {
       factTypeNames.add(factType.name);
 
       // Validate value type
-      final validValueTypes = ['string', 'number', 'boolean', 'date', 'datetime', 'json'];
+      final validValueTypes = [
+        'string',
+        'number',
+        'boolean',
+        'date',
+        'datetime',
+        'json'
+      ];
       if (!validValueTypes.contains(factType.valueType.toLowerCase())) {
         errors.add(ValidationError(
           code: McpValidationCodes.invalidValue,
@@ -1236,9 +1333,13 @@ class McpBundleValidator {
 
   // ==================== Tools Section Validation ====================
 
-  static List<ValidationError> _validateToolsSection(ToolsSection tools) {
+  static List<ValidationError> _validateToolsSection(
+    ToolsSection tools,
+    List<AccessRight> accessRights,
+  ) {
     final errors = <ValidationError>[];
     final toolNames = <String>{};
+    final accessRightIds = {for (final p in accessRights) p.id};
 
     for (var i = 0; i < tools.tools.length; i++) {
       final tool = tools.tools[i];
@@ -1253,12 +1354,24 @@ class McpBundleValidator {
         ));
       }
 
-      // kind must not be unknown
+      // kind is required and must be known (spec 04 §4.2)
       if (tool.kind == ToolKind.unknown) {
         errors.add(ValidationError(
           code: McpValidationCodes.invalidValue,
-          message: 'Tool kind must be one of host/mcp/cloud/js',
+          message: 'Tool kind is required and must be one of '
+              'host/mcp/cloud/js/ts',
           location: '$path.kind',
+        ));
+      }
+
+      // A named access right must be one the manifest declares.
+      final accessRight = tool.accessRight;
+      if (accessRight != null && !accessRightIds.contains(accessRight)) {
+        errors.add(ValidationError(
+          code: McpValidationCodes.unknownReference,
+          message: 'Tool access right "$accessRight" is not declared in '
+              'manifest.accessRights',
+          location: '$path.accessRight',
         ));
       }
 
@@ -1572,8 +1685,7 @@ class McpBundleValidator {
     final errors = <ValidationError>[];
 
     // Collect all defined IDs across sections
-    final skillIds =
-        bundle.skills?.modules.map((m) => m.id).toSet() ?? {};
+    final skillIds = bundle.skills?.modules.map((m) => m.id).toSet() ?? {};
     final pageIds =
         bundle.ui?.pages.values.map((s) => s.id).toSet() ?? <String>{};
     final knowledgeSourceIds =
@@ -1603,8 +1715,7 @@ class McpBundleValidator {
             errors.add(ValidationError(
               code: McpValidationCodes.unknownReference,
               message: 'Unknown knowledge source reference: ${ref.sourceId}',
-              location:
-                  'skills.modules[$i].knowledgeSources[$j].sourceId',
+              location: 'skills.modules[$i].knowledgeSources[$j].sourceId',
             ));
           }
         }
@@ -1612,8 +1723,7 @@ class McpBundleValidator {
         // Validate procedure entryPoint and step next/onError references
         for (var j = 0; j < module.procedures.length; j++) {
           final proc = module.procedures[j];
-          final stepIds =
-              proc.steps.map((s) => s.id).toSet();
+          final stepIds = proc.steps.map((s) => s.id).toSet();
 
           // entryPoint must reference a valid step
           if (proc.entryPoint != null &&
@@ -1622,16 +1732,14 @@ class McpBundleValidator {
             errors.add(ValidationError(
               code: McpValidationCodes.unknownReference,
               message: 'Unknown entryPoint step: ${proc.entryPoint}',
-              location:
-                  'skills.modules[$i].procedures[$j].entryPoint',
+              location: 'skills.modules[$i].procedures[$j].entryPoint',
             ));
           }
 
           // Step next/onError references
           for (var k = 0; k < proc.steps.length; k++) {
             final step = proc.steps[k];
-            final stepPath =
-                'skills.modules[$i].procedures[$j].steps[$k]';
+            final stepPath = 'skills.modules[$i].procedures[$j].steps[$k]';
 
             for (final nextId in step.next) {
               if (!stepIds.contains(nextId)) {
@@ -1643,12 +1751,10 @@ class McpBundleValidator {
               }
             }
 
-            if (step.onError != null &&
-                !stepIds.contains(step.onError)) {
+            if (step.onError != null && !stepIds.contains(step.onError)) {
               errors.add(ValidationError(
                 code: McpValidationCodes.unknownReference,
-                message:
-                    'Unknown onError step reference: ${step.onError}',
+                message: 'Unknown onError step reference: ${step.onError}',
                 location: '$stepPath.onError',
               ));
             }
@@ -1739,13 +1845,11 @@ class McpBundleValidator {
     for (final module in bundle.skills?.modules ?? <SkillModule>[]) {
       for (final proc in module.procedures) {
         for (final step in proc.steps) {
-          final stepNodeId =
-              'proc:${module.id}:${proc.id}:${step.id}';
+          final stepNodeId = 'proc:${module.id}:${proc.id}:${step.id}';
           graph.putIfAbsent(stepNodeId, () => []);
 
           for (final nextId in step.next) {
-            final nextNodeId =
-                'proc:${module.id}:${proc.id}:$nextId';
+            final nextNodeId = 'proc:${module.id}:${proc.id}:$nextId';
             graph[stepNodeId]!.add(nextNodeId);
             graph.putIfAbsent(nextNodeId, () => []);
           }
@@ -1754,8 +1858,7 @@ class McpBundleValidator {
     }
 
     // Page → skill edges via UI actions
-    for (final page
-        in bundle.ui?.pages.values ?? const <PageDefinition>[]) {
+    for (final page in bundle.ui?.pages.values ?? const <PageDefinition>[]) {
       final pageId = 'page:${page.id}';
       graph.putIfAbsent(pageId, () => []);
       _collectWidgetDeps(page.root, pageId, graph);

@@ -1,3 +1,25 @@
+## [0.4.11] - 2026-10-09
+
+### Changed — tool `kind` is required (bundle spec 04 §4.2)
+- The spec now states what the validator already enforced: every tool
+  declares `kind`; an omitted or unrecognized value is rejected, never read
+  as `host`. The error names all five kinds (`host/mcp/cloud/js/ts`).
+
+### Added — access rights (bundle spec 02 §2.3.1, 04 §4.2)
+- `BundleManifest.accessRights` — who may use which part of the app: the
+  rights the bundle's tools are gated by. `AccessRight` with `id`, `label`
+  and `description` by language tag, `risk` (`AccessRisk`: read · write ·
+  danger) and `default` (`AccessDefault`: none · member · admin; absent =
+  none). Distinct from the UI DSL's device and client permissions.
+- `ToolEntry.accessRight` — the right a caller must hold to invoke the
+  tool; absent = the implicit `use` right only (`implicitUseAccessRight`).
+  `ToolEntry.scoped` — the tool's records belong to the caller's unit; the
+  host attaches and filters by it.
+- Validation: access right ids unique, lowercase dotted and not `use`; a
+  label; a known risk and default; a tool's `accessRight` must be declared
+  in `manifest.accessRights` (`UNKNOWN_REFERENCE`).
+- A bundle that declares no access rights reads and validates as before.
+
 ## [0.4.10] - 2026-09-03
 
 This release carries two additions: the analysis contract gains the fields

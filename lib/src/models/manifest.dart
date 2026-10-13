@@ -3,6 +3,8 @@
 /// Contains metadata and configuration for the bundle.
 library;
 
+import 'access_right.dart';
+
 /// Version of the bundle schema.
 const String currentSchemaVersion = '1.0.0';
 
@@ -43,6 +45,10 @@ class BundleManifest {
 
   /// Required capabilities.
   final List<String> capabilities;
+
+  /// Access rights this bundle's tools are gated by. Empty = every tool
+  /// requires only the implicit `use` right.
+  final List<AccessRight> accessRights;
 
   /// Tags for categorization.
   final List<String> tags;
@@ -105,6 +111,7 @@ class BundleManifest {
     this.homepage,
     this.repository,
     this.capabilities = const [],
+    this.accessRights = const [],
     this.tags = const [],
     this.dependencies = const [],
     this.platform,
@@ -138,6 +145,11 @@ class BundleManifest {
       homepage: json['homepage'] as String?,
       repository: json['repository'] as String?,
       capabilities: _parseStringList(json['capabilities']),
+      accessRights: (json['accessRights'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(AccessRight.fromJson)
+              .toList() ??
+          const [],
       tags: _parseStringList(json['tags']),
       dependencies: (json['dependencies'] as List<dynamic>?)
               ?.map((e) => BundleDependency.fromJson(e as Map<String, dynamic>))
@@ -184,6 +196,8 @@ class BundleManifest {
       if (homepage != null) 'homepage': homepage,
       if (repository != null) 'repository': repository,
       if (capabilities.isNotEmpty) 'capabilities': capabilities,
+      if (accessRights.isNotEmpty)
+        'accessRights': accessRights.map((p) => p.toJson()).toList(),
       if (tags.isNotEmpty) 'tags': tags,
       if (dependencies.isNotEmpty)
         'dependencies': dependencies.map((d) => d.toJson()).toList(),
@@ -219,6 +233,7 @@ class BundleManifest {
     String? homepage,
     String? repository,
     List<String>? capabilities,
+    List<AccessRight>? accessRights,
     List<String>? tags,
     List<BundleDependency>? dependencies,
     PlatformRequirements? platform,
@@ -249,6 +264,7 @@ class BundleManifest {
       homepage: homepage ?? this.homepage,
       repository: repository ?? this.repository,
       capabilities: capabilities ?? this.capabilities,
+      accessRights: accessRights ?? this.accessRights,
       tags: tags ?? this.tags,
       dependencies: dependencies ?? this.dependencies,
       platform: platform ?? this.platform,
